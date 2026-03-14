@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Jeff · Prospection">
+<title>Jeff · Prospection</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#1a56a0;--blue-l:#dbeafe;
+  --green:#15803d;--green-l:#dcfce7;
+  --red:#b91c1c;--red-l:#fee2e2;
+  --orange:#c2410c;--orange-l:#ffedd5;
+  --amber:#a16207;--amber-l:#fef9c3;
+  --purple:#6d28d9;--purple-l:#ede9fe;
+  --teal:#0f766e;
+  --text:#0f172a;--text2:#475569;--text3:#94a3b8;
+  --bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;
+  --bdr:#e2e8f0;--bdr2:#cbd5e1;
+  --r:12px;--rsm:8px;
+  --sb:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-top,0px)
+}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:var(--bg);color:var(--text)}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+
+/* NOTIF */
+#notif-bar{position:fixed;top:0;left:0;right:0;z-index:3000;background:#0f172a;color:#fff;padding:calc(var(--st)+10px) 14px 10px;display:none;align-items:flex-start;gap:10px;animation:slidedown .3s ease}
+.nb-body{flex:1}.nb-t{font-size:14px;font-weight:700}.nb-s{font-size:12px;color:#94a3b8;margin-top:2px}
+.nb-acts{display:flex;gap:8px;margin-top:8px}
+.nb-btn{padding:5px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer}
+#nb-close{background:none;border:none;color:#64748b;font-size:20px;cursor:pointer}
+
+/* HEADER */
+.hdr{flex-shrink:0;display:flex;align-items:center;padding:calc(var(--st)+8px) 14px 10px;background:var(--bg);border-bottom:1px solid var(--bdr);gap:8px;min-height:52px}
+.hdr.h{display:none}
+.hdr-back{width:34px;height:34px;border-radius:50%;background:var(--bg2);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--blue);flex-shrink:0}
+.hdr-back svg{width:18px;height:18px;stroke-width:2.5}
+.hdr-title{font-size:17px;font-weight:800;flex:1}
+.hdr-btn{padding:7px 14px;border-radius:20px;background:var(--blue);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+
+/* MAP */
+#map-wrap{flex:1;position:relative;min-height:0}
+#map{width:100%;height:100%}
+
+/* PANELS */
+.panel{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.panel.on{display:flex}
+.pb{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 24px}
+
+/* NAV */
+#nav{flex-shrink:0;background:var(--bg);border-top:1px solid var(--bdr);display:flex;padding-bottom:var(--sb);overflow-x:auto;scrollbar-width:none}
+#nav::-webkit-scrollbar{display:none}
+.nbb{flex:1;min-width:48px;display:flex;flex-direction:column;align-items:center;padding:7px 2px 5px;border:none;background:none;font-size:8px;font-weight:700;color:var(--text3);gap:2px;cursor:pointer;position:relative;white-space:nowrap}
+.nbb.on{color:var(--blue)}
+.nbb svg{width:20px;height:20px;stroke-width:1.8}
+.nbadge{position:absolute;top:3px;right:calc(50% - 20px);background:var(--red);color:#fff;font-size:7px;border-radius:8px;padding:1px 4px;font-weight:800;min-width:14px;text-align:center}
+
+/* MAP UI */
+.top-bar{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;gap:6px}
+.search-pill{flex:1;display:flex;align-items:center;background:var(--bg);border:1px solid var(--bdr);border-radius:24px;box-shadow:0 2px 14px rgba(0,0,0,.13);height:42px;overflow:hidden}
+.search-pill input{flex:1;padding:0 12px;font-size:14px;border:none;outline:none;background:transparent;color:var(--text)}
+.search-pill input::placeholder{color:var(--text3)}
+.search-pill button{padding:0 12px 0 4px;background:none;border:none;cursor:pointer}
+.icon-pill{width:42px;height:42px;border-radius:50%;border:1px solid var(--bdr);background:var(--bg);box-shadow:0 2px 14px rgba(0,0,0,.13);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+#search-results{position:absolute;top:58px;left:10px;right:10px;z-index:600;background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:0 4px 20px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;display:none}
+.sr-item{padding:11px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px}
+.sr-item:last-child{border:none}
+.sr-item:active{background:var(--bg2)}
+
+/* MODE BANNERS */
+.mode-banner{position:absolute;top:62px;left:50%;transform:translateX(-50%);z-index:500;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.25);display:none;align-items:center;gap:8px}
+.mb-end{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;margin-left:2px}
+
+/* MAP CONTROLS */
+.map-ctrl{position:absolute;top:62px;right:10px;z-index:500;background:var(--bg);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.mc{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:none;background:none;cursor:pointer;color:var(--text2);position:relative}
+.mc:active{background:var(--bg2)}
+.mc.on{color:var(--orange);background:var(--orange-l)}
+.mc-sep{height:1px;background:var(--bdr)}
+.mc .tt{display:none;position:absolute;right:46px;top:50%;transform:translateY(-50%);background:#0f172a;color:#fff;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none}
+.mc:hover .tt{display:block}
+
+/* FABs */
+.fabs{position:absolute;right:14px;bottom:22px;z-index:499;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.fab{border:none;border-radius:14px;padding:10px 14px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.fab:active{transform:scale(.97)}
+.fab svg{width:14px;height:14px;stroke-width:2.5;flex-shrink:0}
+#fab-menu{display:none;flex-direction:column;gap:8px;align-items:flex-end}
+.fab-toggle{width:46px;height:46px;border-radius:50%;background:#0f172a;color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:400;padding:0;border:none;cursor:pointer}
+
+/* LEGEND */
+.legend{position:absolute;bottom:100px;left:10px;z-index:499;background:rgba(255,255,255,.97);border:1px solid var(--bdr);border-radius:12px;padding:9px 12px;font-size:11px;max-width:155px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.lg-t{font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.lg-r{display:flex;align-items:center;gap:6px;color:var(--text2);margin-bottom:3px}
+.lg-r:last-child{margin:0}
+.lg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.lg-sq{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+.lg-line{width:16px;height:4px;border-radius:2px;flex-shrink:0}
+.lg-sep{height:1px;background:var(--bdr);margin:5px 0}
+
+/* STATS */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
+.sc{background:var(--bg2);border-radius:var(--r);padding:12px 14px;border:1px solid var(--bdr)}
+.sv{font-size:28px;font-weight:800;line-height:1}
+.sl{font-size:11px;color:var(--text2);margin-top:3px}
+.sec-h{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px}
+.sec-h:first-child{margin-top:0}
+.prog{height:5px;background:var(--bg3);border-radius:3px;margin-top:6px}
+.prog-f{height:5px;border-radius:3px}
+
+/* SEARCH */
+.sw{position:relative;margin-bottom:8px}
+.sw input{width:100%;padding:10px 14px 10px 36px;border:1.5px solid var(--bdr);border-radius:24px;background:var(--bg2);font-size:14px;color:var(--text);outline:none}
+.sw input:focus{border-color:var(--blue)}
+.sw::before{content:'';position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat center/contain}
+.chips{display:flex;gap:5px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--bg);font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ENTITY CARDS */
+.cc{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.cc:active{background:var(--bg2)}
+.cc-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.cc-sq{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.cc-body{flex:1;min-width:0}
+.cc-name{font-size:14px;font-weight:700}
+.cc-addr{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.cc-tags{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:5px}
+.badge{font-size:10px;padding:2px 7px;border-radius:7px;font-weight:700}
+.late-tag{font-size:10px;color:var(--red);font-weight:700}
+.ok-tag{font-size:10px;color:var(--text2)}
+.cc-arr{color:var(--text3);font-size:20px;flex-shrink:0}
+
+/* ZONES */
+.zone-card{border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer;border:2px solid transparent}
+.zone-card:active{opacity:.8}
+.zone-swatch{width:36px;height:36px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff}
+.zone-body{flex:1;min-width:0}
+.zone-name{font-size:14px;font-weight:700}
+.zone-sub{font-size:11px;margin-top:2px}
+.zone-acts{display:flex;gap:6px;align-items:center}
+.zone-act-btn{padding:5px 10px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer}
+
+/* RELANCES */
+.alert-card{background:#fff8f0;border:1.5px solid #fed7aa;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.ac-lbl{font-size:9px;font-weight:800;color:#ea580c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.ac-name{font-size:14px;font-weight:700;color:#9a3412}
+.ac-addr{font-size:12px;color:#c2410c;margin-top:2px}
+.ac-tel{display:inline-flex;align-items:center;gap:5px;margin-top:6px;background:#fff;border:1px solid #fed7aa;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:#9a3412;text-decoration:none}
+
+/* RUES */
+.rue-card{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.rue-bar{width:5px;height:38px;border-radius:3px;flex-shrink:0}
+.rue-body{flex:1;min-width:0}
+.rue-name{font-size:13px;font-weight:700}
+.rue-meta{font-size:11px;color:var(--text2);margin-top:2px}
+.rue-warn{font-size:10px;color:var(--orange);font-weight:700;margin-top:3px}
+
+/* MANDAT CARD */
+.mc-card{background:#fff;border:1.5px solid var(--purple-l);border-radius:var(--r);padding:13px 14px;margin-bottom:8px;cursor:pointer}
+.mc-card:active{background:var(--bg2)}
+.mc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.mc-ico{width:32px;height:32px;border-radius:8px;background:var(--purple-l);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.mc-title{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-det{font-size:11px;color:var(--text2);margin-right:8px}
+
+/* SHEETS */
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1000;display:flex;align-items:flex-end}
+.ov.h{display:none}
+.sheet{background:var(--bg);border-radius:22px 22px 0 0;width:100%;max-height:95dvh;overflow:hidden;display:flex;flex-direction:column;padding-bottom:var(--sb)}
+.handle{width:38px;height:4px;background:var(--bdr2);border-radius:2px;margin:10px auto 2px}
+.sh-head{padding:8px 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr)}
+.sh-t{font-size:17px;font-weight:800}
+.sh-x{width:30px;height:30px;border-radius:50%;background:var(--bg3);border:none;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2)}
+.sh-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px}
+.sh-foot{padding:12px 16px;border-top:1px solid var(--bdr);display:flex;gap:8px}
+.fl{font-size:11px;font-weight:800;color:var(--text2);display:block;margin-bottom:4px;margin-top:12px}
+.fl:first-child{margin-top:0}
+.fi{width:100%;padding:11px 13px;border:1.5px solid var(--bdr);border-radius:var(--rsm);background:var(--bg2);font-size:15px;color:var(--text);outline:none;-webkit-appearance:none;display:block}
+.fi:focus{border-color:var(--blue);background:var(--bg)}
+select.fi{background:var(--bg2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;padding-right:34px;appearance:none}
+textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.btn-p{flex:2;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:800;cursor:pointer}
+.btn-g{flex:2;padding:13px;background:var(--green);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:800;cursor:pointer}
+.btn-y{flex:2;padding:13px;background:var(--amber);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:800;cursor:pointer}
+.btn-purple{flex:2;padding:13px;background:#7c3aed;color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:800;cursor:pointer}
+.btn-s{padding:13px 14px;background:var(--bg2);color:var(--text);border:1.5px solid var(--bdr);border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer}
+.btn-d{width:100%;padding:12px;background:var(--red-l);color:var(--red);border:1.5px solid #fecaca;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
+
+/* SELECTORS */
+.sel-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.sel-opt{padding:8px 10px;border:1.5px solid var(--bdr);border-radius:var(--rsm);cursor:pointer;font-size:12px;font-weight:700;background:var(--bg2);white-space:nowrap;flex:1;min-width:70px;text-align:center}
+.sel-opt.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.sel-opt.hot{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+.sel-opt.warm{background:#ffedd5;border-color:#fdba74;color:#c2410c}
+.sel-opt.cold{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+
+/* COLORS PICKER */
+.color-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.color-opt{width:30px;height:30px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:.1s}
+.color-opt.on{border-color:#0f172a;transform:scale(1.15)}
+
+/* CONFIG */
+.cfg-row{display:flex;align-items:center;gap:10px;padding:13px 14px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);cursor:pointer;margin-bottom:8px}
+.cfg-row svg{width:18px;height:18px;flex-shrink:0;color:var(--blue)}
+.cfg-row span{font-size:14px;font-weight:600;flex:1}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px}
+.empty-ico{font-size:36px;margin-bottom:10px}
+.empty-t{font-size:15px;font-weight:700;margin-bottom:6px}
+.empty-s{font-size:13px;color:var(--text2);line-height:1.5}
+
+/* SAVE INDICATOR */
+#save-indicator{position:fixed;bottom:calc(var(--sb) + 56px);left:50%;transform:translateX(-50%);z-index:2000;background:#0f172a;color:#fff;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;display:none;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none}
+#save-indicator.saving{background:#1e56a0}
+#save-indicator.saved{background:#15803d}
+#save-indicator.error{background:#b91c1c}
+
+/* TIP */
+#tip{background:var(--blue-l);border-bottom:1px solid #bfdbfe;padding:9px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+#tip span{font-size:12px;color:#1e40af;flex:1}
+#tip button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}
+#tip-x{background:none;border:none;color:#93c5fd;font-size:18px;cursor:pointer}
+
+@keyframes pulse{0%,100%{box-shadow:0 2px 8px rgba(185,28,28,.3)}50%{box-shadow:0 0 0 8px rgba(185,28,28,.1)}}
+@keyframes pulse2{0%,100%{box-shadow:0 2px 8px rgba(161,98,7,.3)}50%{box-shadow:0 0 0 6px rgba(161,98,7,.12)}}
+@keyframes pulse3{0%,100%{box-shadow:0 2px 8px rgba(124,58,237,.3)}50%{box-shadow:0 0 0 6px rgba(124,58,237,.12)}}
+@keyframes slidedown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- NOTIF -->
+<div id="save-indicator">
+  <span id="si-icon">💾</span>
+  <span id="si-text">Sauvegarde…</span>
+</div>
+
+<div id="notif-bar">
+  <div class="nb-body">
+    <div class="nb-t" id="nb-t"></div>
+    <div class="nb-s" id="nb-s"></div>
+    <div class="nb-acts">
+      <button class="nb-btn" style="background:var(--blue);color:#fff" onclick="showView('relances');closeNotif()">Voir relances</button>
+      <button class="nb-btn" style="background:rgba(255,255,255,.1);color:#fff" onclick="closeNotif()">Plus tard</button>
+    </div>
+  </div>
+  <button id="nb-close" onclick="closeNotif()">×</button>
+</div>
+
+<div id="tip" style="display:none">
+  <span>📱 Installez l'app sur l'écran d'accueil</span>
+  <button onclick="openOv('install')">Guide</button>
+  <button id="tip-x" onclick="document.getElementById('tip').style.display='none'">×</button>
+</div>
+
+<!-- HEADER -->
+<div class="hdr h" id="app-hdr">
+  <button class="hdr-back" onclick="showView('map')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="hdr-title" id="hdr-title"></span>
+  <button class="hdr-btn" id="hdr-extra" style="display:none"></button>
+</div>
+
+<!-- CARTE -->
+<div id="map-wrap">
+  <div id="map"></div>
+
+  <div class="top-bar">
+    <div class="search-pill">
+      <input id="addr-input" placeholder="Adresse, rue…" oninput="onSrchInput()" onkeydown="if(event.key==='Enter')doSearch()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button onclick="doSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+    </div>
+    <div class="icon-pill" onclick="geolocate()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </div>
+  </div>
+
+  <div id="search-results"></div>
+
+  <!-- Mode banners -->
+  <div class="mode-banner" id="mb-c" style="background:#0f172a;color:#fff">👆 Tapez la carte — placer contact<button class="mb-end" onclick="stopMode()">Annuler</button></div>
+  <div class="mode-banner" id="mb-v" style="background:var(--amber);color:#fff">🏠 Tapez l'emplacement du bien<button class="mb-end" onclick="stopMode()">Annuler</button></div>
+  <div class="mode-banner" id="mb-m" style="background:#7c3aed;color:#fff">📋 Tapez l'emplacement du mandat<button class="mb-end" onclick="stopMode()">Annuler</button></div>
+  <div class="mode-banner" id="mb-r" style="background:var(--green);color:#fff">🖌 Tapez les points de la rue<button class="mb-end" onclick="finishRue()">Terminer ✓</button></div>
+  <div class="mode-banner" id="mb-p" style="background:#0f172a;color:#fff">🚪 Tapez la porte / adresse<button class="mb-end" onclick="stopMode()">Annuler</button></div>
+  <div class="mode-banner" id="mb-z" style="background:#0369a1;color:#fff">✏️ Tracez votre zone — 1 tap = 1 point<button class="mb-end" onclick="finishZone()">Fermer ✓</button></div>
+
+  <!-- Controls -->
+  <div class="map-ctrl">
+    <button class="mc" onclick="map.zoomIn()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="tt">Zoom +</span></button>
+    <div class="mc-sep"></div>
+    <button class="mc" onclick="map.zoomOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="tt">Zoom -</span></button>
+    <div class="mc-sep"></div>
+    <button class="mc" id="sat-btn" onclick="toggleSat()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg><span class="tt">Satellite</span></button>
+    <div class="mc-sep"></div>
+    <button class="mc" id="heat-btn" onclick="toggleHeatmap()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg><span class="tt">Heatmap</span></button>
+    <div class="mc-sep"></div>
+    <button class="mc" onclick="showView('config')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg><span class="tt">Paramètres</span></button>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="lg-t">Contacts</div>
+    <div class="lg-r"><div class="lg-dot" style="background:#64748b"></div>Non contacté</div>
+    <div class="lg-r"><div class="lg-dot" style="background:#1d4ed8"></div>Contacté</div>
+    <div class="lg-r"><div class="lg-dot" style="background:#c2410c"></div>RDV</div>
+    <div class="lg-r"><div class="lg-dot" style="background:#15803d"></div>Mandat signé</div>
+    <div class="lg-sep"></div>
+    <div class="lg-t">Autres repères</div>
+    <div class="lg-r"><div class="lg-dot" style="background:#f59e0b"></div>PAP</div>
+    <div class="lg-r"><div class="lg-dot" style="background:#ef4444"></div>Agence concurrente</div>
+    <div class="lg-r"><div class="lg-sq" style="background:#7c3aed"></div>Mandat en cours</div>
+    <div class="lg-r"><div class="lg-sq" style="background:#0f172a"></div>Porte / adresse</div>
+    <div class="lg-sep"></div>
+    <div class="lg-t">Rues prospectées</div>
+    <div class="lg-r"><div class="lg-line" style="background:#15803d"></div>Boîtage récent</div>
+    <div class="lg-r"><div class="lg-line" style="background:#1d4ed8"></div>Appels récents</div>
+    <div class="lg-r"><div class="lg-line" style="background:#f59e0b"></div>À refaire (60j+)</div>
+  </div>
+
+  <!-- FABs -->
+  <div class="fabs">
+    <div id="fab-menu">
+      <button class="fab" style="background:var(--blue);color:#fff;box-shadow:0 4px 18px rgba(26,86,160,.4)" onclick="startMode('contact');closeFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Contact</button>
+      <button class="fab" style="background:var(--amber);color:#fff;box-shadow:0 4px 18px rgba(161,98,7,.4)" onclick="startMode('vente');closeFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Bien repéré</button>
+      <button class="fab" style="background:#7c3aed;color:#fff;box-shadow:0 4px 18px rgba(124,58,237,.4)" onclick="startMode('mandat');closeFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Mandat en cours</button>
+      <button class="fab" style="background:var(--green);color:#fff;box-shadow:0 4px 18px rgba(21,128,61,.4)" onclick="startMode('rue');closeFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Surligner rue</button>
+      <button class="fab" style="background:#0f172a;color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.35)" onclick="startMode('porte');closeFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="12" r="1.5"/></svg>Porte / adresse</button>
+      <button class="fab" style="background:#0369a1;color:#fff;box-shadow:0 4px 18px rgba(3,105,161,.4)" onclick="startMode('zone');closeFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="3 7 9 3 15 7 21 3 21 17 15 21 9 17 3 21"/></svg>Dessiner une zone</button>
+    </div>
+    <button class="fab-toggle" id="fab-btn" onclick="toggleFab()">＋</button>
+  </div>
+</div>
+
+<!-- PANELS -->
+<div class="panel" id="panel-stats"><div class="pb" id="stats-body"></div></div>
+<div class="panel" id="panel-contacts">
+  <div style="padding:10px 16px 0;flex-shrink:0">
+    <div class="sw"><input id="search-c" placeholder="Nom, adresse, notes…" oninput="renderContacts()"></div>
+    <div class="chips" id="chips-c"></div>
+  </div>
+  <div class="pb" id="contacts-body"></div>
+</div>
+<div class="panel" id="panel-mandats">
+  <div style="padding:10px 16px 0;flex-shrink:0"><div class="chips" id="chips-m"></div></div>
+  <div class="pb" id="mandats-body"></div>
+</div>
+<div class="panel" id="panel-relances"><div class="pb" id="relances-body"></div></div>
+<div class="panel" id="panel-portes">
+  <div style="padding:10px 16px 0;flex-shrink:0"><div class="chips" id="chips-p"></div></div>
+  <div class="pb" id="portes-body"></div>
+</div>
+<div class="panel" id="panel-rues"><div class="pb" id="rues-body"></div></div>
+<div class="panel" id="panel-zones"><div class="pb" id="zones-body"></div></div>
+<div class="panel" id="panel-config"><div class="pb" id="config-body"></div></div>
+
+<!-- NAV -->
+<div id="nav">
+  <button class="nbb on" id="nb-map" onclick="showView('map')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>Carte</button>
+  <button class="nbb" id="nb-stats" onclick="showView('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stats</button>
+  <button class="nbb" id="nb-contacts" onclick="showView('contacts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contacts</button>
+  <button class="nbb" id="nb-mandats" onclick="showView('mandats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Mandats<span class="nbadge" id="mandat-badge" style="display:none">0</span></button>
+  <button class="nbb" id="nb-relances" onclick="showView('relances')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Relances<span class="nbadge" id="rel-badge" style="display:none">0</span></button>
+  <button class="nbb" id="nb-portes" onclick="showView('portes')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="12" r="1.5"/></svg>Portes<span class="nbadge" id="porte-badge" style="display:none">0</span></button>
+  <button class="nbb" id="nb-rues" onclick="showView('rues')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12h18M3 6h18M3 18h18"/></svg>Rues</button>
+  <button class="nbb" id="nb-zones" onclick="showView('zones')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="3 7 9 3 15 7 21 3 21 17 15 21 9 17 3 21"/></svg>Zones</button>
+</div>
+</div>
+
+<!-- ══════════════════ SHEETS ══════════════════ -->
+
+<!-- Contact -->
+<div class="ov h" id="ov-contact">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t" id="sh-c-t">Nouveau contact</span><button class="sh-x" onclick="closeOv('contact')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Nom / Prénom *</label><input class="fi" id="f-name" placeholder="ex : Dupont Marie">
+      <label class="fl">Adresse</label><input class="fi" id="f-addr" placeholder="ex : 12 Bd du Petit Nice">
+      <label class="fl">Catégorie</label>
+      <div class="sel-row">
+        <div class="sel-opt" data-cat="vendeur" onclick="selCat(this)">🏠 Vendeur</div>
+        <div class="sel-opt" data-cat="acheteur" onclick="selCat(this)">🔍 Acheteur</div>
+        <div class="sel-opt" data-cat="apporteur" onclick="selCat(this)">🤝 Apporteur</div>
+        <div class="sel-opt" data-cat="locataire" onclick="selCat(this)">🔑 Locataire</div>
+        <div class="sel-opt" data-cat="notaire" onclick="selCat(this)">⚖️ Pro</div>
+        <div class="sel-opt" data-cat="autre" onclick="selCat(this)">👤 Autre</div>
+      </div>
+      <label class="fl">Température</label>
+      <div class="sel-row">
+        <div class="sel-opt" data-temp="hot" onclick="selTemp(this)">🔥 Chaud</div>
+        <div class="sel-opt" data-temp="warm" onclick="selTemp(this)">🌤 Tiède</div>
+        <div class="sel-opt" data-temp="cold" onclick="selTemp(this)">❄️ Froid</div>
+      </div>
+      <div class="row2">
+        <div><label class="fl">Zone</label><select class="fi" id="f-zone"><option value="">— Aucune —</option></select></div>
+        <div><label class="fl">Statut</label>
+          <select class="fi" id="f-status">
+            <option value="new">Non contacté</option><option value="contacted">Contacté</option>
+            <option value="rdv">RDV planifié</option><option value="mandat">Mandat signé</option>
+            <option value="relance">À relancer</option><option value="froid">Contact froid</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div><label class="fl">Source</label>
+          <select class="fi" id="f-source">
+            <option>Pige PAP</option><option>Boîtage</option><option>Meta Ads</option>
+            <option>Réseau</option><option>Parrainage</option><option>Terrain</option><option>Autre</option>
+          </select>
+        </div>
+        <div><label class="fl">Relance le</label><input class="fi" type="date" id="f-followup"></div>
+      </div>
+      <label class="fl">Téléphone</label><input class="fi" id="f-tel" type="tel" placeholder="06 12 34 56 78">
+      <label class="fl">Prix estimé (€)</label><input class="fi" id="f-price" type="number" placeholder="320000">
+      <label class="fl">Notes</label><textarea class="fi" id="f-notes" placeholder="Observations, comportement, points clés…"></textarea>
+      <button class="btn-d" id="btn-del-c" style="display:none" onclick="deleteContact()">🗑 Supprimer ce contact</button>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('contact')">Annuler</button><button class="btn-p" onclick="saveContact()">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- Bien repéré -->
+<div class="ov h" id="ov-vente">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t" id="sh-v-t">Bien repéré</span><button class="sh-x" onclick="closeOv('vente')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Adresse</label><input class="fi" id="v-addr" placeholder="ex: 45 Bd du Panorama">
+      <label class="fl">Type</label>
+      <select class="fi" id="v-type"><option value="pap">🏠 PAP – Particulier</option><option value="agence">🏢 Autre agence</option></select>
+      <div class="row2">
+        <div><label class="fl">Prix affiché (€)</label><input class="fi" id="v-price" type="number" placeholder="380000"></div>
+        <div><label class="fl">Agence</label><input class="fi" id="v-agence" placeholder="ex: Orpi"></div>
+      </div>
+      <div class="row2">
+        <div><label class="fl">Zone</label><select class="fi" id="v-zone"><option value="">— Aucune —</option></select></div>
+        <div><label class="fl">Relance le</label><input class="fi" type="date" id="v-followup"></div>
+      </div>
+      <label class="fl">Notes</label><textarea class="fi" id="v-notes" style="min-height:55px"></textarea>
+      <button class="btn-d" id="btn-del-v" style="display:none" onclick="deleteVente()">🗑 Supprimer</button>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('vente')">Annuler</button><button class="btn-y" onclick="saveVente()">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- Mandat -->
+<div class="ov h" id="ov-mandat">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t" id="sh-m-t">Nouveau mandat</span><button class="sh-x" onclick="closeOv('mandat')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Adresse *</label><input class="fi" id="m-addr" placeholder="ex : 8 Bd du Petit Nice, 13008">
+      <div class="row2">
+        <div><label class="fl">Type mandat</label>
+          <select class="fi" id="m-typeM"><option value="exclusif">Exclusif</option><option value="simple">Simple</option><option value="semi">Semi-exclusif</option></select>
+        </div>
+        <div><label class="fl">Type bien</label>
+          <select class="fi" id="m-typeB"><option value="appartement">Appartement</option><option value="maison">Maison</option><option value="villa">Villa</option><option value="terrain">Terrain</option><option value="local">Local</option></select>
+        </div>
+      </div>
+      <div class="row3">
+        <div><label class="fl">Surface m²</label><input class="fi" id="m-surface" type="number" placeholder="75"></div>
+        <div><label class="fl">Pièces</label><input class="fi" id="m-rooms" type="number" placeholder="3"></div>
+        <div><label class="fl">Étage</label><input class="fi" id="m-floor" placeholder="2"></div>
+      </div>
+      <div class="row2">
+        <div><label class="fl">Prix (€)</label><input class="fi" id="m-price" type="number" placeholder="350000"></div>
+        <div><label class="fl">Honoraires %</label><input class="fi" id="m-fees" type="number" placeholder="5" step="0.1"></div>
+      </div>
+      <div class="row2">
+        <div><label class="fl">Début</label><input class="fi" type="date" id="m-start"></div>
+        <div><label class="fl">Fin mandat</label><input class="fi" type="date" id="m-end"></div>
+      </div>
+      <label class="fl">Lien annonce</label><input class="fi" id="m-url" type="url" placeholder="https://www.leboncoin.fr/...">
+      <label class="fl">Propriétaire</label><input class="fi" id="m-owner" placeholder="Nom prénom">
+      <label class="fl">Téléphone</label><input class="fi" id="m-tel" type="tel" placeholder="06 12 34 56 78">
+      <div class="row2">
+        <div><label class="fl">Zone</label><select class="fi" id="m-zone"><option value="">— Aucune —</option></select></div>
+        <div><label class="fl">Statut</label>
+          <select class="fi" id="m-status"><option value="actif">Actif</option><option value="offre">Offre reçue</option><option value="compromis">Compromis</option><option value="suspendu">Suspendu</option><option value="expire">Expiré</option></select>
+        </div>
+      </div>
+      <label class="fl">Notes</label><textarea class="fi" id="m-notes" placeholder="Travaux, historique visites…"></textarea>
+      <button class="btn-d" id="btn-del-m" style="display:none" onclick="deleteMandat()">🗑 Supprimer le mandat</button>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('mandat')">Annuler</button><button class="btn-purple" onclick="saveMandat()">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- Rue -->
+<div class="ov h" id="ov-rue">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t" id="sh-r-t">Nommer la rue</span><button class="sh-x" onclick="closeOv('rue')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Nom de la rue / tronçon</label><input class="fi" id="r-name" placeholder="ex : Bd du Petit Nice côté pair">
+      <div class="row2">
+        <div><label class="fl">Zone</label><select class="fi" id="r-zone"><option value="">— Aucune —</option></select></div>
+        <div><label class="fl">Type action</label>
+          <select class="fi" id="r-type">
+            <option value="boitage">Boîtage</option><option value="appels">Appels pige</option>
+            <option value="porte">Porte à porte</option><option value="digital">Pub digitale</option><option value="todo">Planifié</option>
+          </select>
+        </div>
+      </div>
+      <label class="fl">Type de publicité</label>
+      <div class="sel-row" id="pub-row">
+        <div class="sel-opt" data-pub="flyer" onclick="selPub(this)">📄 Flyers</div>
+        <div class="sel-opt" data-pub="carte" onclick="selPub(this)">💳 Carte visite</div>
+        <div class="sel-opt" data-pub="courrier" onclick="selPub(this)">✉️ Courrier</div>
+        <div class="sel-opt" data-pub="digital" onclick="selPub(this)">📱 Digital</div>
+        <div class="sel-opt" data-pub="mixed" onclick="selPub(this)">🎯 Mixte</div>
+        <div class="sel-opt" data-pub="rien" onclick="selPub(this)">🚶 Repérage</div>
+      </div>
+      <label class="fl">Date</label><input class="fi" type="date" id="r-date">
+      <label class="fl">Notes</label><textarea class="fi" id="r-notes" style="min-height:55px" placeholder="Nb de boîtes, résultats…"></textarea>
+      <div style="background:var(--green-l);border:1px solid #86efac;border-radius:var(--rsm);padding:10px 12px;margin-top:10px;font-size:12px;color:#166534;line-height:1.5">🔔 Rappel automatique 60 jours après cette date.</div>
+      <button class="btn-d" id="btn-del-r" style="display:none" onclick="deleteRue()">🗑 Supprimer ce tracé</button>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('rue')">Annuler</button><button class="btn-g" onclick="saveRue()">Valider ✓</button></div>
+  </div>
+</div>
+
+<!-- Porte -->
+<div class="ov h" id="ov-porte">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t" id="sh-p-t">Fiche porte</span><button class="sh-x" onclick="closeOv('porte')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Adresse / Description</label><input class="fi" id="po-addr" placeholder="ex : 12 Bd Petit Nice, bât B, RdC G">
+      <label class="fl">Statut</label>
+      <select class="fi" id="po-status">
+        <option value="never">⬜ Jamais contacté</option><option value="refuse">🚫 Refus</option>
+        <option value="relance">🔄 À relancer</option><option value="estim">📊 Estimation faite</option><option value="mandat">🏆 Mandat signé</option>
+      </select>
+      <div style="background:var(--bg2);border-radius:var(--rsm);padding:12px;margin-top:10px;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:800;color:var(--text2);margin-bottom:8px">👤 Propriétaire</div>
+        <label class="fl" style="margin-top:0">Nom</label><input class="fi" id="po-owner" placeholder="Martin Jean">
+        <label class="fl">Téléphone</label><input class="fi" id="po-tel" type="tel" placeholder="06 12 34 56 78">
+        <label class="fl">Prochain passage</label><input class="fi" type="date" id="po-next">
+      </div>
+      <div class="row2">
+        <div><label class="fl">Zone</label><select class="fi" id="po-zone"><option value="">— Aucune —</option></select></div>
+        <div><label class="fl" style="visibility:hidden">_</label>
+          <button onclick="const t=document.getElementById('po-tel').value;if(t)window.location='tel:'+t;else alert('Pas de numéro.')" style="width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);font-size:14px;font-weight:700;cursor:pointer">📞 Appeler</button>
+        </div>
+      </div>
+      <label class="fl">Notes</label><textarea class="fi" id="po-notes" placeholder="Comportement, observations…"></textarea>
+      <button class="btn-d" id="btn-del-p" style="display:none" onclick="deletePorte()">🗑 Supprimer</button>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('porte')">Annuler</button><button class="btn-p" onclick="savePorte()">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- Zone (dessiner) -->
+<div class="ov h" id="ov-zone">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t" id="sh-z-t">Nommer la zone</span><button class="sh-x" onclick="closeOv('zone')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Nom de la zone *</label><input class="fi" id="z-name" placeholder="ex : Secteur Périer Nord">
+      <label class="fl">Couleur</label>
+      <div class="color-row" id="color-row">
+        <div class="color-opt on" data-color="#2563eb" style="background:#2563eb" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#15803d" style="background:#15803d" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#9333ea" style="background:#9333ea" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#dc2626" style="background:#dc2626" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#0f766e" style="background:#0f766e" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#ea580c" style="background:#ea580c" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#be185d" style="background:#be185d" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#0369a1" style="background:#0369a1" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#ca8a04" style="background:#ca8a04" onclick="selColor(this)"></div>
+        <div class="color-opt" data-color="#374151" style="background:#374151" onclick="selColor(this)"></div>
+      </div>
+      <label class="fl">Notes (rues, quartier…)</label><textarea class="fi" id="z-notes" style="min-height:55px" placeholder="ex : Bd Reynaud, Bd Labouly, Périer 8ème"></textarea>
+      <div id="z-pts-info" style="font-size:12px;color:var(--text2);margin-top:8px;font-style:italic"></div>
+      <button class="btn-d" id="btn-del-z" style="display:none" onclick="deleteZone()">🗑 Supprimer cette zone</button>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('zone')">Annuler</button><button class="btn-p" id="btn-save-z" onclick="saveZone()">Enregistrer la zone</button></div>
+  </div>
+</div>
+
+<!-- Relance programmée -->
+<div class="ov h" id="ov-relance">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t">Programmer une relance</span><button class="sh-x" onclick="closeOv('relance')">×</button></div>
+    <div class="sh-body">
+      <label class="fl">Description</label><input class="fi" id="rel-name" placeholder="ex : Rappeler Martin suite visite">
+      <label class="fl">Dans combien de temps ?</label>
+      <div class="sel-row" style="margin-bottom:10px">
+        <div class="sel-opt" data-dur="3" onclick="setDur(this)">3j</div>
+        <div class="sel-opt" data-dur="7" onclick="setDur(this)">1 sem</div>
+        <div class="sel-opt" data-dur="14" onclick="setDur(this)">2 sem</div>
+        <div class="sel-opt" data-dur="30" onclick="setDur(this)">1 mois</div>
+        <div class="sel-opt" data-dur="60" onclick="setDur(this)">2 mois</div>
+      </div>
+      <label class="fl">Ou date précise</label><input class="fi" type="date" id="rel-date">
+      <label class="fl">Zone concernée</label><select class="fi" id="rel-zone"><option value="">Toutes zones</option></select>
+      <label class="fl">Notes</label><textarea class="fi" id="rel-notes" style="min-height:55px"></textarea>
+    </div>
+    <div class="sh-foot"><button class="btn-s" onclick="closeOv('relance')">Annuler</button><button class="btn-p" onclick="saveRelanceProg()">Programmer 🔔</button></div>
+  </div>
+</div>
+
+<!-- Install -->
+<div class="ov h" id="ov-install">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t">Installer l'app 📱</span><button class="sh-x" onclick="closeOv('install')">×</button></div>
+    <div class="sh-body">
+      <div style="background:var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px">iPhone – Safari</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.9">1. Ouvrir dans <strong>Safari</strong><br>2. Bouton <strong>Partager ↑</strong><br>3. <strong>"Sur l'écran d'accueil"</strong><br>4. <strong>Ajouter</strong></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:16px">
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px">Android – Chrome</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.9">1. <strong>Chrome</strong><br>2. Menu <strong>⋮</strong><br>3. <strong>"Ajouter à l'écran d'accueil"</strong></div>
+      </div>
+    </div>
+    <div class="sh-foot"><button class="btn-p" style="width:100%" onclick="closeOv('install')">Compris !</button></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  CONSTANTES
+// ════════════════════════════════════════
+const SK={C:'j9-c',R:'j9-r',V:'j9-v',M:'j9-m',RP:'j9-rp',P:'j9-p',Z:'j9-z'};
+const STALE=60;
+const ZONE_COLORS=['#2563eb','#15803d','#9333ea','#dc2626','#0f766e','#ea580c','#be185d','#0369a1','#ca8a04','#374151'];
+
+const ST={
+  new:{l:'Non contacté',c:'#64748b',bg:'#f1f5f9'},
+  contacted:{l:'Contacté',c:'#1d4ed8',bg:'#dbeafe'},
+  rdv:{l:'RDV planifié',c:'#c2410c',bg:'#ffedd5'},
+  mandat:{l:'Mandat signé',c:'#15803d',bg:'#dcfce7'},
+  relance:{l:'À relancer',c:'#b91c1c',bg:'#fee2e2'},
+  froid:{l:'Contact froid',c:'#94a3b8',bg:'#f8fafc'}
+};
+const CAT={vendeur:{l:'Vendeur',e:'🏠'},acheteur:{l:'Acheteur',e:'🔍'},apporteur:{l:'Apporteur',e:'🤝'},locataire:{l:'Locataire',e:'🔑'},notaire:{l:'Pro',e:'⚖️'},autre:{l:'Autre',e:'👤'}};
+const MS={actif:{l:'Actif',c:'#15803d',bg:'#dcfce7'},offre:{l:'Offre reçue',c:'#c2410c',bg:'#ffedd5'},compromis:{l:'Compromis',c:'#7c3aed',bg:'#ede9fe'},suspendu:{l:'Suspendu',c:'#94a3b8',bg:'#f1f5f9'},expire:{l:'Expiré',c:'#b91c1c',bg:'#fee2e2'}};
+const PST={never:{l:'Jamais contacté',c:'#94a3b8',bg:'#f1f5f9',e:'⬜'},refuse:{l:'Refus',c:'#b91c1c',bg:'#fee2e2',e:'🚫'},relance:{l:'À relancer',c:'#c2410c',bg:'#ffedd5',e:'🔄'},estim:{l:'Estimation faite',c:'#7c3aed',bg:'#ede9fe',e:'📊'},mandat:{l:'Mandat signé',c:'#15803d',bg:'#dcfce7',e:'🏆'}};
+const RC={boitage:'#15803d',appels:'#1d4ed8',porte:'#7c3aed',digital:'#0f766e',todo:'#c2410c',stale:'#f59e0b'};
+const PUB_L={flyer:'📄 Flyers',carte:'💳 Carte visite',courrier:'✉️ Courrier',digital:'📱 Digital',mixed:'🎯 Mixte',rien:'🚶 Repérage'};
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+let contacts=[],rues=[],ventes=[],mandats=[],relancesProg=[],portes=[],zones=[];
+let map,cMk={},rPoly={},vMk={},mMk={},pMk={},zPoly={};
+let editId=null,editRId=null,editVId=null,editMId=null,editPId=null,editZId=null;
+let pendingLL=null,ruePts=[],rueDrawLine=null,zonePts=[],zoneDrawLine=null,zoneDots=[];
+let mode=null,activeFilter='all',activePFilter='all',activeMFilter='all',curView='map';
+let osmLayer,satLayer,satOn=false,myLocMk=null,heatLayer=null;
+let sCat='vendeur',sTemp='warm',sPub='flyer',sColor='#2563eb';
+let srchTimer=null,fabOpen=false;
+
+// ════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=d=>{if(!d)return'';const[y,m,j]=d.split('-');return`${j}/${m}/${y}`;};
+const daysAgo=d=>Math.floor((Date.now()-new Date(d))/(864e5));
+const daysDiff=d=>Math.ceil((new Date(d)-Date.now())/(864e5));
+const addDays=(n)=>{const dt=new Date();dt.setDate(dt.getDate()+n);return dt.toISOString().slice(0,10);};
+const rueColor=r=>r.type==='todo'?RC.todo:(!r.date||daysAgo(r.date)<=STALE)?(RC[r.type]||RC.boitage):RC.stale;
+const getZone=id=>zones.find(z=>z.id===id);
+
+// ════════════════════════════════════════
+//  STORAGE — IndexedDB (stable iOS/Safari)
+//  + localStorage miroir pour lecture rapide
+//  + indicateur visuel de sauvegarde
+// ════════════════════════════════════════
+const DB_NAME='jeff-prospection';const DB_VER=1;const STORE='data';
+let db=null;
+
+function showSaveIndicator(state='saving'){
+  const el=document.getElementById('save-indicator');
+  const icon=document.getElementById('si-icon');
+  const txt=document.getElementById('si-text');
+  if(state==='saving'){el.className='saving';icon.textContent='💾';txt.textContent='Sauvegarde…';}
+  else if(state==='saved'){el.className='saved';icon.textContent='✓';txt.textContent='Sauvegardé';}
+  else{el.className='error';icon.textContent='⚠';txt.textContent='Erreur sauvegarde';}
+  el.style.display='flex';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.style.display='none',state==='saving'?10000:1800);
+}
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE);};
+    req.onsuccess=e=>{db=e.target.result;res(db);};
+    req.onerror=e=>{console.warn('IDB open error',e);rej(e);};
+  });
+}
+
+function idbGet(key){
+  return new Promise(res=>{
+    if(!db){res(null);return;}
+    try{const tx=db.transaction(STORE,'readonly');const req=tx.objectStore(STORE).get(key);req.onsuccess=e=>res(e.target.result);req.onerror=()=>res(null);}catch(e){res(null);}
+  });
+}
+
+function idbSet(key,val){
+  return new Promise(res=>{
+    if(!db){res(false);return;}
+    try{const tx=db.transaction(STORE,'readwrite');const req=tx.objectStore(STORE).put(val,key);req.onsuccess=()=>res(true);req.onerror=()=>res(false);}catch(e){res(false);}
+  });
+}
+
+const DATA_MAP={C:'contacts',R:'rues',V:'ventes',M:'mandats',RP:'relancesProg',P:'portes',Z:'zones'};
+
+async function loadAll(){
+  try{await openDB();}catch(e){console.warn('IDB unavailable, fallback to localStorage');}
+  for(const[k,name]of Object.entries(DATA_MAP)){
+    // Try IndexedDB first
+    let val=null;
+    if(db){
+      try{val=await idbGet(SK[k]);}catch(e){}
+    }
+    // Fallback to localStorage
+    if(val===null){
+      try{const ls=localStorage.getItem(SK[k]);if(ls)val=JSON.parse(ls);}catch(e){}
+    }
+    if(val!==null&&Array.isArray(val))window[name]=val;
+  }
+}
+
+let saveDebounceTimers={};
+
+function makeSaver(key){
+  return async function(){
+    showSaveIndicator('saving');
+    clearTimeout(saveDebounceTimers[key]);
+    saveDebounceTimers[key]=setTimeout(async()=>{
+      const name=DATA_MAP[key];
+      const val=window[name]||[];
+      let ok=false;
+      // Save to IndexedDB
+      if(db){try{ok=await idbSet(SK[key],val);}catch(e){}}
+      // Always mirror to localStorage
+      try{localStorage.setItem(SK[key],JSON.stringify(val));ok=true;}catch(e){}
+      showSaveIndicator(ok?'saved':'error');
+    },300);
+  };
+}
+
+const saveC=makeSaver('C'),saveR=makeSaver('R'),saveV=makeSaver('V'),
+      saveM=makeSaver('M'),saveRP=makeSaver('RP'),saveP=makeSaver('P'),saveZ=makeSaver('Z');
+
+// ════════════════════════════════════════
+//  MAP
+// ════════════════════════════════════════
+function initMap(){
+  osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20});
+  satLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20});
+  map=L.map('map',{zoomControl:false,attributionControl:false}).setView([43.262,5.400],13);
+  osmLayer.addTo(map);
+  map.on('click',e=>{
+    document.getElementById('search-results').style.display='none';
+    if(fabOpen)closeFab();
+    if(mode==='contact'){pendingLL=e.latlng;stopMode();openOvWith('contact',null);}
+    else if(mode==='vente'){pendingLL=e.latlng;stopMode();openOvWith('vente',null);}
+    else if(mode==='mandat'){pendingLL=e.latlng;stopMode();openOvWith('mandat',null);}
+    else if(mode==='porte'){pendingLL=e.latlng;stopMode();openOvWith('porte',null);}
+    else if(mode==='rue'){addRuePt(e.latlng);}
+    else if(mode==='zone'){addZonePt(e.latlng);}
+  });
+  renderAll();
+}
+function toggleSat(){satOn=!satOn;satOn?(map.removeLayer(osmLayer),satLayer.addTo(map)):(map.removeLayer(satLayer),osmLayer.addTo(map));document.getElementById('sat-btn').classList.toggle('on',satOn);}
+function renderAll(){renderContactMarkers();renderVenteMarkers();renderMandatMarkers();renderPorteMarkers();renderRueLines();renderZonePolys();}
+
+// ════════════════════════════════════════
+//  ZONE POLYGONS
+// ════════════════════════════════════════
+function renderZonePolys(){
+  Object.values(zPoly).forEach(l=>{try{l.remove()}catch(e){}});zPoly={};
+  zones.forEach(z=>{
+    if(!z.pts||z.pts.length<3)return;
+    const poly=L.polygon(z.pts,{color:z.color,weight:2.5,fillColor:z.color,fillOpacity:.12,dashArray:'5 4'})
+      .addTo(map)
+      .bindTooltip(`<b style="color:${z.color}">📍 ${z.name}</b>`,{direction:'top',sticky:false,permanent:false});
+    poly.on('click',()=>openOvWith('zone',z.id));
+    // Zone label au centroid
+    const bounds=L.polygon(z.pts).getBounds();
+    const center=bounds.getCenter();
+    L.marker([center.lat,center.lng],{
+      icon:L.divIcon({className:'',
+        html:`<div style="background:${z.color};color:#fff;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2);cursor:pointer" onclick="_clickZone('${z.id}')">${z.name}</div>`,
+        iconAnchor:[0,10]
+      }),interactive:false
+    }).addTo(map);
+    zPoly[z.id]=poly;
+  });
+}
+window._clickZone=id=>openOvWith('zone',id);
+
+// ════════════════════════════════════════
+//  ZONE DRAWING
+// ════════════════════════════════════════
+function addZonePt(ll){
+  zonePts.push([ll.lat,ll.lng]);
+  // Draw dot
+  const dot=L.circleMarker([ll.lat,ll.lng],{radius:5,fillColor:'#0369a1',fillOpacity:1,color:'#fff',weight:2}).addTo(map);
+  zoneDots.push(dot);
+  // Update preview line
+  if(zoneDrawLine)zoneDrawLine.remove();
+  if(zonePts.length>=2){
+    const previewPts=[...zonePts,zonePts[0]]; // close preview
+    zoneDrawLine=L.polyline(previewPts,{color:'#0369a1',weight:3,dashArray:'6 4',opacity:.8}).addTo(map);
+  }
+  document.getElementById('z-pts-info').textContent=`${zonePts.length} point${zonePts.length>1?'s':''} placé${zonePts.length>1?'s':''}. ${zonePts.length>=3?'Appuyez "Fermer ✓" pour terminer.':'Continuez à taper des points.'}`;
+}
+
+function finishZone(){
+  if(zonePts.length<3){alert('Placez au moins 3 points pour délimiter une zone.');return;}
+  stopMode();
+  openOvWith('zone',null);
+}
+
+function clearZoneDraft(){
+  if(zoneDrawLine){zoneDrawLine.remove();zoneDrawLine=null;}
+  zoneDots.forEach(d=>{try{d.remove()}catch(e){}});zoneDots=[];
+  zonePts=[];
+}
+
+// ════════════════════════════════════════
+//  CONTACT MARKERS
+// ════════════════════════════════════════
+function renderContactMarkers(){
+  Object.values(cMk).forEach(m=>{try{m.remove()}catch(e){}});cMk={};
+  contacts.forEach(c=>{
+    const st=ST[c.status]||ST.new;const cat=CAT[c.cat]||CAT.autre;
+    const late=c.followup&&c.followup<=today()&&c.status!=='mandat';
+    const col=late?'#b91c1c':st.c;
+    const border=c.temp==='hot'?'#ef4444':c.temp==='cold'?'#3b82f6':'#fff';
+    const anim=late?';animation:pulse 1.5s infinite':'';
+    const icon=L.divIcon({className:'',html:`<div style="width:20px;height:20px;border-radius:50%;background:${col};border:3px solid ${border};box-shadow:0 2px 8px rgba(0,0,0,.3)${anim};display:flex;align-items:center;justify-content:center;font-size:9px">${cat.e}</div>`,iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-13]});
+    const m=L.marker([c.lat,c.lng],{icon}).addTo(map);
+    m.bindPopup(`<div style="min-width:210px;font-family:-apple-system,sans-serif">
+      <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:2px">${cat.l}</div>
+      <div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:2px">${c.name}</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:6px">📍 ${c.addr||'—'}</div>
+      <span style="font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700;background:${st.bg};color:${st.c}">${st.l}</span>
+      ${c.temp?`<span style="font-size:11px;margin-left:6px">${c.temp==='hot'?'🔥':c.temp==='cold'?'❄️':'🌤'}</span>`:''}
+      ${c.price>0?`<div style="font-size:12px;color:#64748b;margin-top:4px">💰 ${Number(c.price).toLocaleString('fr-FR')} €</div>`:''}
+      ${c.tel?`<div><a href="tel:${c.tel}" style="font-size:12px;color:#1e56a0;font-weight:700">📞 ${c.tel}</a></div>`:''}
+      ${c.followup?`<div style="font-size:11px;color:${late?'#b91c1c':'#64748b'};margin-top:3px">${late?'⚠ Retard':'🔔'} ${fmtD(c.followup)}</div>`:''}
+      ${c.notes?`<div style="font-size:11px;color:#64748b;font-style:italic;margin-top:4px">"${c.notes.slice(0,60)}…"</div>`:''}
+      <button onclick="_eC('${c.id}')" style="width:100%;padding:9px;margin-top:8px;background:#1e56a0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+    </div>`,{maxWidth:260});
+    cMk[c.id]=m;
+  });
+}
+window._eC=id=>{if(map._popup)map.closePopup();openOvWith('contact',id);};
+
+// ════════════════════════════════════════
+//  VENTE MARKERS
+// ════════════════════════════════════════
+function renderVenteMarkers(){
+  Object.values(vMk).forEach(m=>{try{m.remove()}catch(e){}});vMk={};
+  ventes.forEach(v=>{
+    const col=v.type==='pap'?'#f59e0b':'#ef4444';
+    const icon=L.divIcon({className:'',html:`<div style="width:22px;height:22px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;animation:pulse2 2s infinite">${v.type==='pap'?'🏠':'🏢'}</div>`,iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-13]});
+    const m=L.marker([v.lat,v.lng],{icon}).addTo(map);
+    m.bindPopup(`<div style="min-width:200px;font-family:-apple-system,sans-serif">
+      <div style="font-size:10px;font-weight:800;color:${col};text-transform:uppercase;margin-bottom:4px">${v.type==='pap'?'PAP':'Autre agence'}${v.agence?' · '+v.agence:''}</div>
+      <div style="font-size:14px;font-weight:800;margin-bottom:4px">📍 ${v.addr}</div>
+      ${v.price>0?`<div style="font-size:13px;margin-bottom:4px">💰 ${Number(v.price).toLocaleString('fr-FR')} €</div>`:''}
+      ${v.followup?`<div style="font-size:11px;color:#64748b;margin-bottom:5px">🔔 ${fmtD(v.followup)}</div>`:''}
+      <button onclick="_eV('${v.id}')" style="width:100%;padding:9px;background:${col};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+    </div>`,{maxWidth:240});
+    vMk[v.id]=m;
+  });
+}
+window._eV=id=>{if(map._popup)map.closePopup();openOvWith('vente',id);};
+
+// ════════════════════════════════════════
+//  MANDAT MARKERS
+// ════════════════════════════════════════
+function renderMandatMarkers(){
+  Object.values(mMk).forEach(m=>{try{m.remove()}catch(e){}});mMk={};
+  mandats.forEach(mn=>{
+    const ms=MS[mn.status]||MS.actif;
+    const expiring=mn.end&&daysDiff(mn.end)<=14&&daysDiff(mn.end)>=0;
+    const anim=expiring?';animation:pulse3 1.8s infinite':'';
+    const icon=L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:6px;background:${ms.c};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px${anim}">📋</div>`,iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-14]});
+    const m=L.marker([mn.lat,mn.lng],{icon}).addTo(map);
+    const d=mn.end?daysDiff(mn.end):null;
+    m.bindPopup(`<div style="min-width:220px;font-family:-apple-system,sans-serif">
+      <div style="font-size:10px;font-weight:800;color:#7c3aed;text-transform:uppercase;margin-bottom:3px">MANDAT ${(mn.typeM||'exclusif').toUpperCase()}</div>
+      <div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:3px">📍 ${mn.addr}</div>
+      <span style="font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700;background:${ms.bg};color:${ms.c}">${ms.l}</span>
+      ${mn.price>0?`<div style="font-size:14px;font-weight:800;margin:5px 0">💰 ${Number(mn.price).toLocaleString('fr-FR')} €</div>`:''}
+      ${d!==null?`<div style="font-size:11px;color:${d<0?'#94a3b8':d<=7?'#b91c1c':d<=14?'#c2410c':'#64748b'};font-weight:700;margin:3px 0">${d<0?'Expiré':d===0?'Expire auj.':d<=14?`⚠ Expire dans ${d}j`:`Valide ${d}j`}</div>`:''}
+      ${mn.url?`<a href="${mn.url}" target="_blank" style="display:block;font-size:12px;color:#7c3aed;font-weight:700;margin:4px 0">🔗 Voir l'annonce</a>`:''}
+      ${mn.tel?`<a href="tel:${mn.tel}" style="display:block;font-size:12px;color:#1e56a0;font-weight:700">📞 ${mn.tel}</a>`:''}
+      <button onclick="_eM('${mn.id}')" style="width:100%;padding:9px;margin-top:8px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+    </div>`,{maxWidth:260});
+    mMk[mn.id]=m;
+  });
+}
+window._eM=id=>{if(map._popup)map.closePopup();openOvWith('mandat',id);};
+
+// ════════════════════════════════════════
+//  PORTE MARKERS
+// ════════════════════════════════════════
+function renderPorteMarkers(){
+  Object.values(pMk).forEach(m=>{try{m.remove()}catch(e){}});pMk={};
+  portes.forEach(p=>{
+    const st=PST[p.status]||PST.never;
+    const late=p.nextVisit&&p.nextVisit<=today();
+    const icon=L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:3px;background:${st.c};border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:8px${late?';animation:pulse 1.5s infinite':''}">${st.e}</div>`,iconSize:[16,16],iconAnchor:[8,8],popupAnchor:[0,-10]});
+    const m=L.marker([p.lat,p.lng],{icon}).addTo(map);
+    m.bindPopup(`<div style="min-width:200px;font-family:-apple-system,sans-serif">
+      <span style="font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700;background:${st.bg};color:${st.c}">${st.l}</span>
+      <div style="font-size:14px;font-weight:800;margin:5px 0">📍 ${p.addr||'Adresse inconnue'}</div>
+      ${p.owner?`<div style="font-size:12px;color:#64748b">👤 ${p.owner}${p.tel?` · <a href="tel:${p.tel}" style="color:#1e56a0;font-weight:700">${p.tel}</a>`:''}</div>`:''}
+      ${p.nextVisit?`<div style="font-size:11px;color:${late?'#b91c1c':'#64748b'};margin-top:3px">${late?'⚠ Passage en retard':'📅'} ${fmtD(p.nextVisit)}</div>`:''}
+      ${p.notes?`<div style="font-size:11px;color:#64748b;font-style:italic;margin-top:4px">"${p.notes.slice(0,60)}"</div>`:''}
+      <button onclick="_eP('${p.id}')" style="width:100%;padding:9px;margin-top:8px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier fiche</button>
+    </div>`,{maxWidth:250});
+    pMk[p.id]=m;
+  });
+}
+window._eP=id=>{if(map._popup)map.closePopup();openOvWith('porte',id);};
+
+// ════════════════════════════════════════
+//  RUE POLYLINES
+// ════════════════════════════════════════
+function renderRueLines(){
+  Object.values(rPoly).forEach(p=>{try{p.remove()}catch(e){}});rPoly={};
+  rues.forEach(r=>{
+    const col=rueColor(r);
+    const p=L.polyline(r.points,{color:col,weight:7,opacity:.82,lineCap:'round',lineJoin:'round',dashArray:r.type==='todo'?'8 6':undefined}).addTo(map);
+    // White center stripe
+    L.polyline(r.points,{color:'#fff',weight:2,opacity:.4,lineCap:'round',lineJoin:'round'}).addTo(map);
+    const stale=r.date&&daysAgo(r.date)>STALE&&r.type!=='todo';
+    p.bindPopup(`<div style="font-family:-apple-system,sans-serif;min-width:190px">
+      <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px">${r.name}</div>
+      ${stale?`<div style="font-size:11px;font-weight:800;color:#c2410c;margin-bottom:4px">⚠ ${daysAgo(r.date)}j — à re-prospecter !</div>`:''}
+      <div style="font-size:11px;color:#64748b">${r.type==='boitage'?'Boîtage':r.type==='appels'?'Appels':r.type==='porte'?'Porte à porte':r.type==='digital'?'Digital':'Planifié'}</div>
+      ${r.pub?`<div style="font-size:11px;color:#64748b;margin-top:2px">${PUB_L[r.pub]||r.pub}</div>`:''}
+      ${r.date?`<div style="font-size:11px;color:#64748b;margin-top:2px">📅 ${fmtD(r.date)}</div>`:''}
+      ${r.notes?`<div style="font-size:11px;color:#64748b;font-style:italic;margin-top:4px">${r.notes}</div>`:''}
+      <button onclick="_eR('${r.id}')" style="width:100%;padding:8px;margin-top:8px;background:#15803d;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+    </div>`,{maxWidth:240});
+    rPoly[r.id]=p;
+  });
+}
+window._eR=id=>{if(map._popup)map.closePopup();openOvWith('rue',id);};
+
+// ════════════════════════════════════════
+//  MODES
+// ════════════════════════════════════════
+function startMode(m){
+  stopMode();mode=m;
+  const banners={contact:'mb-c',vente:'mb-v',mandat:'mb-m',rue:'mb-r',porte:'mb-p',zone:'mb-z'};
+  if(banners[m])document.getElementById(banners[m]).style.display='flex';
+  if(m==='rue')ruePts=[];
+  if(m==='zone'){zonePts=[];clearZoneDraft();}
+  map.getContainer().style.cursor='crosshair';
+  showView('map');
+}
+function addRuePt(ll){
+  ruePts.push([ll.lat,ll.lng]);
+  if(rueDrawLine)rueDrawLine.remove();
+  if(ruePts.length>=2)rueDrawLine=L.polyline(ruePts,{color:'#15803d',weight:5,dashArray:'7 4',opacity:.9}).addTo(map);
+  else L.circleMarker([ll.lat,ll.lng],{radius:5,fillColor:'#15803d',fillOpacity:1,color:'#fff',weight:2}).addTo(map);
+}
+function finishRue(){if(ruePts.length<2){alert('Placez au moins 2 points.');return;}stopMode();openOvWith('rue',null);}
+function stopMode(){
+  mode=null;
+  ['mb-c','mb-v','mb-m','mb-r','mb-p','mb-z'].forEach(id=>document.getElementById(id).style.display='none');
+  map.getContainer().style.cursor='';
+}
+
+// ════════════════════════════════════════
+//  HEATMAP
+// ════════════════════════════════════════
+function toggleHeatmap(){
+  if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;document.getElementById('heat-btn').classList.remove('on');return;}
+  if(!L.heatLayer){alert('Heatmap non disponible.');return;}
+  const pts=[
+    ...contacts.map(c=>[c.lat,c.lng,c.status==='mandat'?1.5:0.8]),
+    ...portes.map(p=>[p.lat,p.lng,p.status==='mandat'?1.5:p.status==='estim'?1.2:p.status==='relance'?1:0.5]),
+    ...rues.flatMap(r=>(r.points||[]).slice(0,5).map(pt=>[pt[0],pt[1],0.4]))
+  ];
+  if(!pts.length){alert('Aucune donnée à afficher.');return;}
+  heatLayer=L.heatLayer(pts,{radius:35,blur:25,maxZoom:18,gradient:{0.2:'#3b82f6',0.5:'#f59e0b',1:'#ef4444'}}).addTo(map);
+  document.getElementById('heat-btn').classList.add('on');
+}
+
+// ════════════════════════════════════════
+//  SEARCH
+// ════════════════════════════════════════
+function onSrchInput(){
+  clearTimeout(srchTimer);
+  const q=document.getElementById('addr-input').value.trim();
+  if(q.length<3){document.getElementById('search-results').style.display='none';return;}
+  srchTimer=setTimeout(()=>fetchSuggestions(q),400);
+}
+async function fetchSuggestions(q){
+  try{
+    const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Marseille')}&format=json&limit=5&addressdetails=1&countrycodes=fr&accept-language=fr`);
+    const data=await res.json();
+    const box=document.getElementById('search-results');
+    if(!data.length){box.style.display='none';return;}
+    box.innerHTML=data.map(r=>{
+      const main=r.display_name.split(',').slice(0,2).join(',').trim();
+      const sub=(r.address.postcode||'')+(r.address.city?' '+r.address.city:'');
+      return`<div class="sr-item" onclick="goToResult(${r.lat},${r.lon},'${main.replace(/'/g,"\\'")}')">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--blue-l);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${r.class==='highway'?'🛣️':r.type==='house'?'🏠':'📍'}</div>
+        <div style="min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${main}</div>${sub?`<div style="font-size:11px;color:var(--text3)">${sub}</div>`:''}</div>
+      </div>`;
+    }).join('');
+    box.style.display='block';
+  }catch(e){}
+}
+function goToResult(lat,lon,name){
+  document.getElementById('search-results').style.display='none';
+  document.getElementById('addr-input').value=name.split(',')[0];
+  const ll=[parseFloat(lat),parseFloat(lon)];
+  map.setView(ll,18);
+  if(map._popup)map.closePopup();
+  L.popup().setLatLng(ll).setContent(`<div style="font-family:-apple-system,sans-serif;font-size:13px;font-weight:700">📍 ${name}</div>`).openOn(map);
+}
+async function doSearch(){
+  const q=document.getElementById('addr-input').value.trim();if(!q)return;
+  await fetchSuggestions(q);
+  const box=document.getElementById('search-results');
+  if(box.style.display==='none'||!box.innerHTML.trim()){
+    try{
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Marseille')}&format=json&limit=1`);
+      const data=await res.json();
+      if(data.length)goToResult(data[0].lat,data[0].lon,data[0].display_name);
+      else alert('Adresse non trouvée.');
+    }catch(e){alert('Connexion requise.');}
+  }
+}
+function geolocate(){
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(
+    p=>{const ll=[p.coords.latitude,p.coords.longitude];
+      if(myLocMk)myLocMk.remove();
+      myLocMk=L.circleMarker(ll,{radius:9,fillColor:'#1e56a0',fillOpacity:1,color:'#fff',weight:3}).addTo(map).bindPopup('<b>📍 Vous êtes ici</b>').openPopup();
+      map.setView(ll,17);},
+    ()=>alert('Position indisponible. Vérifiez les autorisations.'),
+    {enableHighAccuracy:true,timeout:10000}
+  );
+}
+
+// ════════════════════════════════════════
+//  FAB
+// ════════════════════════════════════════
+function toggleFab(){fabOpen=!fabOpen;document.getElementById('fab-menu').style.display=fabOpen?'flex':'none';document.getElementById('fab-btn').textContent=fabOpen?'×':'＋';document.getElementById('fab-btn').style.background=fabOpen?'#ef4444':'#0f172a';}
+function closeFab(){if(fabOpen)toggleFab();}
+
+// ════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════
+const VIEW_T={stats:'Tableau de bord',contacts:'Contacts',mandats:'Mandats en cours',relances:'Relances',portes:'Portes & Propriétaires',rues:'Rues prospectées',zones:'Mes zones',config:'Paramètres'};
+
+function showView(v){
+  curView=v;
+  const isMap=v==='map';
+  document.getElementById('map-wrap').style.display=isMap?'block':'none';
+  document.getElementById('app-hdr').classList.toggle('h',isMap);
+  ['stats','contacts','mandats','relances','portes','rues','zones','config'].forEach(x=>{
+    document.getElementById('panel-'+x).classList.toggle('on',x===v);
+    const nb=document.getElementById('nb-'+x);if(nb)nb.classList.toggle('on',x===v);
+  });
+  document.getElementById('nb-map').classList.toggle('on',isMap);
+  if(!isMap){
+    document.getElementById('hdr-title').textContent=VIEW_T[v]||v;
+    const eb=document.getElementById('hdr-extra');
+    if(v==='relances'){eb.style.display='block';eb.textContent='+ Relance';eb.onclick=()=>openOv('relance');}
+    else if(v==='zones'){eb.style.display='block';eb.textContent='+ Zone';eb.onclick=()=>{startMode('zone');};}
+    else eb.style.display='none';
+  }
+  if(isMap)setTimeout(()=>map.invalidateSize(),50);
+  if(v==='stats')renderStats();
+  if(v==='contacts')renderContacts();
+  if(v==='mandats')renderMandats();
+  if(v==='relances')renderRelances();
+  if(v==='portes')renderPortes();
+  if(v==='rues')renderRues();
+  if(v==='zones')renderZones();
+  if(v==='config')renderConfig();
+}
+
+// ════════════════════════════════════════
+//  STATS
+// ════════════════════════════════════════
+function renderStats(){
+  const td=today();
+  const pipeline=contacts.filter(c=>c.price>0).reduce((s,c)=>s+Number(c.price),0);
+  const mPipeline=mandats.filter(mn=>mn.price>0).reduce((s,mn)=>s+Number(mn.price),0);
+  const staleN=rues.filter(r=>r.date&&daysAgo(r.date)>STALE&&r.type!=='todo').length;
+  const expM=mandats.filter(mn=>mn.end&&daysDiff(mn.end)<=14&&daysDiff(mn.end)>=0).length;
+  let h=`<div style="font-size:11px;color:var(--text2);margin-bottom:12px">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>`;
+  h+=`<div class="sg">
+    <div class="sc"><div class="sv">${contacts.length}</div><div class="sl">Contacts</div></div>
+    <div class="sc"><div class="sv">${contacts.filter(c=>c.status==='rdv').length}</div><div class="sl">RDV</div></div>
+    <div class="sc"><div class="sv" style="color:#7c3aed">${mandats.filter(mn=>mn.status==='actif').length}</div><div class="sl">Mandats actifs</div></div>
+    <div class="sc"><div class="sv">${portes.length}</div><div class="sl">Fiches portes</div></div>
+  </div>`;
+  if(mPipeline>0)h+=`<div class="sc" style="margin-bottom:12px;background:var(--purple-l);border-color:#c4b5fd"><div class="sv" style="font-size:20px;color:#7c3aed">${mPipeline.toLocaleString('fr-FR')} €</div><div class="sl">Volume mandats en cours</div></div>`;
+  if(pipeline>0)h+=`<div class="sc" style="margin-bottom:12px"><div class="sv" style="font-size:20px">${pipeline.toLocaleString('fr-FR')} €</div><div class="sl">Pipeline contacts estimé</div></div>`;
+  if(expM>0)h+=`<div class="sc" style="margin-bottom:12px;background:var(--amber-l);border-color:#fde68a"><div class="sv" style="font-size:22px;color:var(--amber)">${expM}</div><div class="sl">Mandat${expM>1?'s':''} expirant dans 14j</div></div>`;
+  if(staleN>0)h+=`<div class="sc" style="margin-bottom:12px;background:var(--orange-l);border-color:#fdba74"><div class="sv" style="font-size:22px;color:var(--orange)">${staleN}</div><div class="sl">Rue${staleN>1?'s':''} à re-prospecter (60j+)</div></div>`;
+
+  // Portes progression
+  if(portes.length){
+    h+=`<div class="sec-h">Progression portes</div>`;
+    const byS=Object.keys(PST).map(k=>({k,n:portes.filter(p=>p.status===k).length}));
+    h+=`<div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px">
+      <div style="display:flex;gap:4px;height:8px;border-radius:4px;overflow:hidden;margin-bottom:8px">`;
+    byS.forEach(({k,n})=>{if(n)h+=`<div style="flex:${n};background:${PST[k].c};min-width:4px" title="${PST[k].l}: ${n}"></div>`;});
+    h+=`</div><div style="display:flex;gap:8px;flex-wrap:wrap">`;
+    byS.forEach(({k,n})=>{if(n)h+=`<div style="font-size:12px;color:${PST[k].c};font-weight:700">${PST[k].e} ${n}</div>`;});
+    h+=`</div></div>`;
+  }
+
+  // Par zone
+  if(zones.length){
+    h+=`<div class="sec-h">Par zone</div>`;
+    zones.forEach(z=>{
+      const zC=contacts.filter(c=>c.zone===z.id).length;
+      const zR=rues.filter(r=>r.zone===z.id&&r.type!=='todo').length;
+      const zM=mandats.filter(mn=>mn.zone===z.id&&mn.status==='actif').length;
+      h+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="focusZone('${z.id}')">
+        <div style="width:12px;height:12px;border-radius:50%;background:${z.color};flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${z.name}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${zC} contacts · ${zR} rues${zM?' · '+zM+' mandat actif':''}</div>
+        </div>
+        <div style="font-size:12px;color:${z.color};font-weight:700">Voir →</div>
+      </div>`;
+    });
+  }
+  document.getElementById('stats-body').innerHTML=h;
+}
+
+// ════════════════════════════════════════
+//  CONTACTS
+// ════════════════════════════════════════
+function renderContacts(){
+  const q=(document.getElementById('search-c').value||'').toLowerCase();
+  const allF=['all',...Object.keys(ST),'---',...Object.keys(CAT)];
+  document.getElementById('chips-c').innerHTML=allF.map(k=>{
+    if(k==='---')return`<div style="width:1px;background:var(--bdr);margin:2px 0"></div>`;
+    let lbl,cnt;
+    if(k==='all'){lbl='Tous';cnt=contacts.length;}
+    else if(ST[k]){lbl=ST[k].l;cnt=contacts.filter(c=>c.status===k).length;}
+    else{lbl=CAT[k]?.l||k;cnt=contacts.filter(c=>c.cat===k).length;}
+    return`<div class="chip${activeFilter===k?' on':''}" onclick="setFilter('${k}')">${lbl} <span style="opacity:.7">${cnt}</span></div>`;
+  }).join('');
+  let list=[...contacts];
+  if(q)list=list.filter(c=>(c.name+c.addr+(c.notes||'')+(CAT[c.cat]?.l||'')).toLowerCase().includes(q));
+  if(activeFilter!=='all'){
+    if(ST[activeFilter])list=list.filter(c=>c.status===activeFilter);
+    else if(CAT[activeFilter])list=list.filter(c=>c.cat===activeFilter);
+  }
+  list.sort((a,b)=>{const ta=a.temp==='hot'?0:a.temp==='warm'?1:2,tb=b.temp==='hot'?0:b.temp==='warm'?1:2;return ta!==tb?ta-tb:(a.followup||'9')<(b.followup||'9')?-1:1;});
+  const td=today();const el=document.getElementById('contacts-body');
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="empty-ico">👤</div><div class="empty-t">${contacts.length?'Aucun résultat':'Aucun contact'}</div><div class="empty-s">Carte → ＋ → Contact, tapez la localisation.</div></div>`;return;}
+  el.innerHTML=list.map(c=>{
+    const st=ST[c.status]||ST.new;const cat=CAT[c.cat]||CAT.autre;
+    const late=c.followup&&c.followup<=td&&c.status!=='mandat';
+    const d=c.followup?daysDiff(c.followup):null;
+    const z=getZone(c.zone);
+    return`<div class="cc" onclick="focusContact('${c.id}')">
+      <div class="cc-av" style="background:${st.c}">${cat.e}</div>
+      <div class="cc-body">
+        <div class="cc-name">${c.name}${c.temp==='hot'?' 🔥':c.temp==='cold'?' ❄️':''}</div>
+        <div class="cc-addr">${c.addr||'Pas d\'adresse'}</div>
+        <div class="cc-tags">
+          <span class="badge" style="background:${st.bg};color:${st.c}">${st.l}</span>
+          ${z?`<span style="font-size:10px;color:${z.color};font-weight:700;background:${z.color}22;padding:2px 6px;border-radius:5px">${z.name}</span>`:''}
+          ${c.price>0?`<span style="font-size:10px;color:var(--text3)">${Number(c.price).toLocaleString('fr-FR')} €</span>`:''}
+          ${c.followup?`<span class="${late?'late-tag':'ok-tag'}">${late?'⚠':d===0?'Auj.':d>0?`+${d}j`:''} ${fmtD(c.followup)}</span>`:''}
+        </div>
+      </div>
+      <div class="cc-arr">›</div></div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  MANDATS
+// ════════════════════════════════════════
+function renderMandats(){
+  const mFilter=activeMFilter;
+  document.getElementById('chips-m').innerHTML=['all',...Object.keys(MS)].map(k=>{
+    const cnt=k==='all'?mandats.length:mandats.filter(m=>m.status===k).length;
+    const l=k==='all'?'Tous':MS[k]?.l||k;
+    return`<div class="chip${mFilter===k?' on':''}" onclick="activeMFilter='${k}';renderMandats()">${l} <span style="opacity:.7">${cnt}</span></div>`;
+  }).join('');
+  let list=mFilter==='all'?[...mandats]:mandats.filter(m=>m.status===mFilter);
+  list.sort((a,b)=>(a.end||'9')<(b.end||'9')?-1:1);
+  const el=document.getElementById('mandats-body');
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="empty-ico">📋</div><div class="empty-t">Aucun mandat</div><div class="empty-s">Carte → ＋ → Mandat en cours</div></div>`;return;}
+  el.innerHTML=list.map(mn=>{
+    const ms=MS[mn.status]||MS.actif;const d=mn.end?daysDiff(mn.end):null;
+    const fees=mn.fees>0&&mn.price>0?Math.round(mn.price*mn.fees/100):0;
+    const expColor=d===null?'var(--text2)':d<0?'#94a3b8':d<=7?'#b91c1c':d<=14?'#c2410c':'var(--text2)';
+    return`<div class="mc-card" onclick="focusMandat('${mn.id}')">
+      <div class="mc-head">
+        <div class="mc-ico">📋</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:800;color:#7c3aed;text-transform:uppercase">${mn.typeM||'exclusif'} · ${mn.typeB||'bien'}</div>
+          <div class="mc-title">${mn.addr}</div>
+        </div>
+        <span style="font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700;background:${ms.bg};color:${ms.c}">${ms.l}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+        ${mn.price>0?`<span class="mc-det">💰 <b>${Number(mn.price).toLocaleString('fr-FR')} €</b></span>`:''}
+        ${mn.surface?`<span class="mc-det">📐 ${mn.surface}m²</span>`:''}
+        ${mn.rooms?`<span class="mc-det">🚪 ${mn.rooms}p</span>`:''}
+        ${fees>0?`<span class="mc-det">✂️ ~${fees.toLocaleString('fr-FR')} €</span>`:''}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;font-weight:700;color:${expColor}">${d===null?'Pas de date fin':d<0?`Expiré il y a ${Math.abs(d)}j`:d===0?'Expire auj.':d<=14?`⚠ Expire dans ${d}j`:`Valide encore ${d}j`}</div>
+        ${mn.url?`<a href="${mn.url}" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:#7c3aed;font-weight:700;text-decoration:none">🔗 Annonce</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  PORTES
+// ════════════════════════════════════════
+function renderPortes(){
+  document.getElementById('chips-p').innerHTML=['all',...Object.keys(PST)].map(k=>{
+    const cnt=k==='all'?portes.length:portes.filter(p=>p.status===k).length;
+    return`<div class="chip${activePFilter===k?' on':''}" onclick="activePFilter='${k}';renderPortes()">${PST[k]?.e||''} ${k==='all'?'Toutes':PST[k]?.l||k} <span style="opacity:.7">${cnt}</span></div>`;
+  }).join('');
+  let list=activePFilter==='all'?[...portes]:portes.filter(p=>p.status===activePFilter);
+  list.sort((a,b)=>{const la=a.nextVisit&&a.nextVisit<=today()?-1:0,lb=b.nextVisit&&b.nextVisit<=today()?-1:0;return la!==lb?la-lb:0;});
+  const el=document.getElementById('portes-body');
+  // mini stats
+  const byS=Object.keys(PST).map(k=>({k,n:portes.filter(p=>p.status===k).length}));
+  let statsH='';
+  if(portes.length>0){
+    statsH=`<div style="background:var(--bg2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px">
+      <div style="display:flex;gap:4px;height:8px;border-radius:4px;overflow:hidden;margin-bottom:6px">`;
+    byS.forEach(({k,n})=>{if(n)statsH+=`<div style="flex:${n};background:${PST[k].c};min-width:4px"></div>`;});
+    statsH+=`</div><div style="display:flex;gap:10px;flex-wrap:wrap">`;
+    byS.forEach(({k,n})=>{if(n)statsH+=`<div style="font-size:12px;color:${PST[k].c};font-weight:700">${PST[k].e} ${n}</div>`;});
+    statsH+=`</div></div>`;
+  }
+  if(!list.length){el.innerHTML=statsH+`<div class="empty"><div class="empty-ico">🚪</div><div class="empty-t">${portes.length?'Aucun résultat':'Aucune fiche porte'}</div><div class="empty-s">Carte → ＋ → Porte/Adresse</div></div>`;return;}
+  const td=today();
+  el.innerHTML=statsH+list.map(p=>{
+    const st=PST[p.status]||PST.never;const late=p.nextVisit&&p.nextVisit<=td;const z=getZone(p.zone);
+    return`<div class="cc" onclick="focusPorte('${p.id}')">
+      <div class="cc-sq" style="background:${st.c};border-radius:6px">${st.e}</div>
+      <div class="cc-body">
+        <div class="cc-name">${p.addr||'Adresse inconnue'}</div>
+        ${p.owner?`<div class="cc-addr">👤 ${p.owner}${p.tel?' · '+p.tel:''}</div>`:`<div class="cc-addr" style="color:var(--text3)">Propriétaire non renseigné</div>`}
+        <div class="cc-tags">
+          <span class="badge" style="background:${st.bg};color:${st.c}">${st.l}</span>
+          ${z?`<span style="font-size:10px;color:${z.color};font-weight:700;background:${z.color}22;padding:2px 6px;border-radius:5px">${z.name}</span>`:''}
+          ${p.nextVisit?`<span class="${late?'late-tag':'ok-tag'}">${late?'⚠ En retard':'📅'} ${fmtD(p.nextVisit)}</span>`:''}
+        </div>
+      </div>
+      <div class="cc-arr">›</div></div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  RELANCES
+// ════════════════════════════════════════
+function renderRelances(){
+  const td=today();
+  const lC=contacts.filter(c=>c.followup&&c.followup<=td&&c.status!=='mandat').sort((a,b)=>a.followup>b.followup?1:-1);
+  const lV=ventes.filter(v=>v.followup&&v.followup<=td).sort((a,b)=>a.followup>b.followup?1:-1);
+  const lRP=relancesProg.filter(r=>!r.done&&r.date&&r.date<=td).sort((a,b)=>a.date>b.date?1:-1);
+  const expM=mandats.filter(mn=>mn.end&&daysDiff(mn.end)<=14&&daysDiff(mn.end)>=0).sort((a,b)=>daysDiff(a.end)-daysDiff(b.end));
+  const staleR=rues.filter(r=>r.date&&daysAgo(r.date)>STALE&&r.type!=='todo').sort((a,b)=>daysAgo(b.date)-daysAgo(a.date));
+  const lP=portes.filter(p=>p.nextVisit&&p.nextVisit<=td&&p.status!=='mandat').sort((a,b)=>a.nextVisit>b.nextVisit?1:-1);
+  const soon=[
+    ...contacts.filter(c=>c.followup&&c.followup>td).map(c=>({t:'c',d:c.followup,o:c})),
+    ...ventes.filter(v=>v.followup&&v.followup>td).map(v=>({t:'v',d:v.followup,o:v})),
+    ...relancesProg.filter(r=>!r.done&&r.date&&r.date>td).map(r=>({t:'rp',d:r.date,o:r}))
+  ].sort((a,b)=>a.d>b.d?1:-1).slice(0,10);
+  let h='';
+  if(lRP.length){
+    h+=`<div class="sec-h" style="color:var(--blue)">🔔 Relances programmées (${lRP.length})</div>`;
+    h+=lRP.map(r=>`<div class="alert-card" style="background:#eff6ff;border-color:#bfdbfe">
+      <div class="ac-lbl" style="color:#1d4ed8">${Math.abs(daysDiff(r.date))}j de retard</div>
+      <div class="ac-name" style="color:#1e40af">${r.name}</div>
+      ${r.notes?`<div style="font-size:11px;color:#3b82f6;margin-top:4px">${r.notes}</div>`:''}
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="markRPDone('${r.id}')" style="flex:1;padding:7px;background:#1e56a0;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✓ Fait</button>
+        <button onclick="delRP('${r.id}')" style="padding:7px 12px;background:var(--red-l);color:var(--red);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🗑</button>
+      </div></div>`).join('');
+  }
+  if(expM.length){
+    h+=`<div class="sec-h" style="color:#7c3aed">📋 Mandats expirant bientôt (${expM.length})</div>`;
+    h+=expM.map(mn=>{const d=daysDiff(mn.end);return`<div class="alert-card" style="background:#faf5ff;border-color:#c4b5fd" onclick="focusMandat('${mn.id}')">
+      <div class="ac-lbl" style="color:#7c3aed">${d===0?'Expire aujourd\'hui':`Expire dans ${d}j`}</div>
+      <div class="ac-name" style="color:#5b21b6">📍 ${mn.addr}</div>
+      ${mn.tel?`<a href="tel:${mn.tel}" class="ac-tel" style="color:#5b21b6;border-color:#c4b5fd" onclick="event.stopPropagation()">📞 ${mn.tel}</a>`:''}
+    </div>`;}).join('');
+  }
+  if(lP.length){
+    h+=`<div class="sec-h" style="color:#0f172a">🚪 Passages en retard (${lP.length})</div>`;
+    h+=lP.map(p=>`<div class="alert-card" style="background:#f8fafc;border-color:#cbd5e1" onclick="focusPorte('${p.id}')">
+      <div class="ac-lbl" style="color:#475569">Porte · ${Math.abs(daysDiff(p.nextVisit))}j de retard</div>
+      <div class="ac-name" style="color:#0f172a">${PST[p.status]?.e||''} ${p.addr}</div>
+      ${p.owner?`<div class="ac-addr" style="color:#475569">👤 ${p.owner}</div>`:''}
+      ${p.tel?`<a href="tel:${p.tel}" class="ac-tel" style="color:#0f172a;border-color:#cbd5e1" onclick="event.stopPropagation()">📞 ${p.tel}</a>`:''}
+    </div>`).join('');
+  }
+  if(staleR.length){
+    h+=`<div class="sec-h" style="color:var(--orange)">🗺 Rues à re-prospecter (${staleR.length})</div>`;
+    h+=staleR.slice(0,4).map(r=>`<div class="alert-card" style="background:#fff7ed;border-color:#fed7aa" onclick="gotoRue('${r.id}')">
+      <div class="ac-lbl">Boîtage il y a ${daysAgo(r.date)} jours</div>
+      <div class="ac-name">${r.name}</div>
+      <div style="font-size:11px;color:#c2410c;margin-top:3px">Dernier passage ${fmtD(r.date)}</div>
+    </div>`).join('');
+    if(staleR.length>4)h+=`<div style="text-align:center;font-size:12px;color:var(--text2);padding:8px">+ ${staleR.length-4} dans l'onglet Rues</div>`;
+  }
+  if(lC.length){
+    h+=`<div class="sec-h" style="color:var(--red)">⚠ Contacts en retard (${lC.length})</div>`;
+    h+=lC.map(c=>{const d=Math.abs(daysDiff(c.followup));const cat=CAT[c.cat]||CAT.autre;
+      return`<div class="alert-card" onclick="focusContact('${c.id}')">
+        <div class="ac-lbl">Retard · ${d}j</div>
+        <div class="ac-name">${cat.e} ${c.name}</div>
+        <div class="ac-addr">📍 ${c.addr}</div>
+        ${c.tel?`<a href="tel:${c.tel}" class="ac-tel" onclick="event.stopPropagation()">📞 ${c.tel}</a>`:''}
+      </div>`;}).join('');
+  }
+  if(lV.length){
+    h+=`<div class="sec-h" style="color:var(--amber)">🏠 Biens à relancer (${lV.length})</div>`;
+    h+=lV.map(v=>{const col=v.type==='pap'?'#d97706':'#ef4444';return`<div class="alert-card" style="background:#fefce8;border-color:#fde68a" onclick="focusVente('${v.id}')">
+      <div class="ac-lbl" style="color:${col}">${v.type==='pap'?'PAP':'Agence'}</div>
+      <div class="ac-name" style="color:${col}">📍 ${v.addr}</div>
+    </div>`;}).join('');
+  }
+  if(soon.length){
+    h+=`<div class="sec-h">📅 À venir</div>`;
+    soon.forEach(({t,d,o})=>{
+      const dd=daysDiff(d);const ds=dd===0?'Aujourd\'hui':dd===1?'Demain':`Dans ${dd}j`;
+      if(t==='c'){const st=ST[o.status]||ST.new;const cat=CAT[o.cat]||CAT.autre;h+=`<div class="cc" onclick="focusContact('${o.id}')"><div class="cc-av" style="background:${st.c}">${cat.e}</div><div class="cc-body"><div class="cc-name">${o.name}</div><div class="cc-addr">${fmtD(d)} · ${ds}</div></div><div class="cc-arr">›</div></div>`;}
+      else if(t==='v'){const col=o.type==='pap'?'#d97706':'#ef4444';h+=`<div class="cc" onclick="focusVente('${o.id}')"><div class="cc-av" style="background:${col}">${o.type==='pap'?'🏠':'🏢'}</div><div class="cc-body"><div class="cc-name">${o.addr}</div><div class="cc-addr">${fmtD(d)} · ${ds}</div></div><div class="cc-arr">›</div></div>`;}
+      else{h+=`<div class="cc"><div class="cc-av" style="background:var(--blue)">🔔</div><div class="cc-body"><div class="cc-name">${o.name}</div><div class="cc-addr">${fmtD(d)} · ${ds}</div></div><button onclick="markRPDone('${o.id}')" style="padding:5px 10px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">✓</button></div>`;}
+    });
+  }
+  if(!lC.length&&!lV.length&&!lRP.length&&!expM.length&&!staleR.length&&!lP.length&&!soon.length)h=`<div class="empty"><div class="empty-ico">✅</div><div class="empty-t">Tout est à jour !</div></div>`;
+  document.getElementById('relances-body').innerHTML=h;
+}
+
+// ════════════════════════════════════════
+//  RUES
+// ════════════════════════════════════════
+function renderRues(){
+  const staleR=rues.filter(r=>r.date&&daysAgo(r.date)>STALE&&r.type!=='todo');
+  let h='';
+  if(!rues.length){document.getElementById('rues-body').innerHTML=`<div class="empty"><div class="empty-ico">🗺</div><div class="empty-t">Aucune rue tracée</div><div class="empty-s">Carte → ＋ → Surligner rue → tapez les points → Terminer.</div></div>`;return;}
+  if(staleR.length){
+    h+=`<div class="sec-h" style="color:var(--orange)">⚠ À re-prospecter (${staleR.length})</div>`;
+    h+=staleR.map(r=>rueCardHtml(r,RC.stale,true)).join('');
+  }
+  [['boitage','Boîtage',RC.boitage],['appels','Appels',RC.appels],['porte','Porte à porte',RC.porte],['digital','Digital',RC.digital],['todo','Planifié',RC.todo]].forEach(([type,label,col])=>{
+    const arr=rues.filter(r=>r.type===type&&(!r.date||daysAgo(r.date)<=STALE));
+    if(!arr.length)return;
+    h+=`<div class="sec-h" style="color:${col}">${label} (${arr.length})</div>`;
+    h+=arr.map(r=>rueCardHtml(r,col,false)).join('');
+  });
+  document.getElementById('rues-body').innerHTML=h;
+}
+function rueCardHtml(r,col,stale){
+  const z=getZone(r.zone);
+  return`<div class="rue-card">
+    <div class="rue-bar" style="background:${col}"></div>
+    <div class="rue-body" onclick="gotoRue('${r.id}')" style="cursor:pointer">
+      <div class="rue-name">${r.name}</div>
+      <div class="rue-meta">${z?`<span style="color:${z.color};font-weight:700">${z.name}</span> · `:''}${r.date?fmtD(r.date):''}${r.pub?' · '+PUB_L[r.pub]:''}${r.notes?' · '+r.notes.slice(0,30):''}</div>
+      ${stale?`<div class="rue-warn">${daysAgo(r.date)} jours depuis la prospection</div>`:''}
+    </div>
+    <button onclick="openOvWith('rue','${r.id}')" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">✏️</button>
+    <button onclick="if(confirm('Supprimer ce tracé ?')){rues=rues.filter(x=>x.id!=='${r.id}');saveR();renderRueLines();renderRues();}" style="padding:6px 8px;background:var(--red-l);color:var(--red);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">🗑</button>
+  </div>`;
+}
+function gotoRue(id){const r=rues.find(x=>x.id===id);if(!r)return;showView('map');setTimeout(()=>{const p=rPoly[id];if(p){map.fitBounds(p.getBounds(),{padding:[50,50]});setTimeout(()=>p.openPopup(),300);}},100);}
+
+// ════════════════════════════════════════
+//  ZONES PANEL
+// ════════════════════════════════════════
+function renderZones(){
+  const el=document.getElementById('zones-body');
+  if(!zones.length){
+    el.innerHTML=`<div class="empty"><div class="empty-ico">🗺</div><div class="empty-t">Aucune zone</div><div class="empty-s">Appuyez "＋ Zone" en haut à droite ou Carte → ＋ → Dessiner une zone.<br><br><b>Comment dessiner :</b><br>1. Appuyez ＋ Zone<br>2. Tapez des points sur la carte pour délimiter votre secteur<br>3. Appuyez "Fermer ✓" quand la zone est tracée<br>4. Donnez un nom et une couleur</div></div>`;
+    return;
+  }
+  el.innerHTML=`<div style="background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1e40af;line-height:1.5">💡 Appuyez sur une zone pour la modifier ou la supprimer. Sur la carte, tapez sur son nom pour l'éditer.</div>`
+  +zones.map(z=>{
+    const nb=contacts.filter(c=>c.zone===z.id).length+portes.filter(p=>p.zone===z.id).length+rues.filter(r=>r.zone===z.id).length+mandats.filter(m=>m.zone===z.id).length;
+    return`<div class="zone-card" style="background:${z.color}18;border-color:${z.color}44">
+      <div class="zone-swatch" style="background:${z.color}">${z.name.charAt(0).toUpperCase()}</div>
+      <div class="zone-body">
+        <div class="zone-name">${z.name}</div>
+        <div class="zone-sub" style="color:${z.color}">${nb} élément${nb!==1?'s':''} attaché${nb!==1?'s':''}</div>
+        ${z.notes?`<div style="font-size:11px;color:var(--text2);margin-top:3px">${z.notes}</div>`:''}
+      </div>
+      <div class="zone-acts">
+        <button class="zone-act-btn" style="background:${z.color}22;color:${z.color}" onclick="focusZone('${z.id}')">📍 Voir</button>
+        <button class="zone-act-btn" style="background:var(--bg2);color:var(--text2)" onclick="openOvWith('zone','${z.id}')">✏️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════
+function renderConfig(){
+  document.getElementById('config-body').innerHTML=`
+    <div class="sec-h">Export & sauvegarde</div>
+    <div class="cfg-row" onclick="exportCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter contacts CSV</span></div>
+    <div class="cfg-row" onclick="exportMandats()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Exporter mandats CSV</span></div>
+    <div class="cfg-row" onclick="exportJSON()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg><span>Sauvegarder tout (JSON)</span></div>
+    <div class="cfg-row" style="color:var(--green)" onclick="document.getElementById('fi').click()"><svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span style="color:var(--green)">Restaurer depuis JSON</span></div>
+    <input type="file" id="fi" accept=".json" style="display:none" onchange="doImport(event)">
+    <div class="sec-h" style="margin-top:16px">Application</div>
+    <div class="cfg-row" onclick="openOv('install')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg><span>Guide installation iPhone / Android</span></div>
+    <div class="sec-h" style="margin-top:16px;color:var(--red)">Zone dangereuse</div>
+    <button onclick="resetAll()" style="width:100%;padding:12px;background:var(--red-l);color:var(--red);border:1.5px solid #fecaca;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer">🗑 Tout remettre à zéro</button>`;
+}
+
+// ════════════════════════════════════════
+//  SELECTORS
+// ════════════════════════════════════════
+function selCat(el){sCat=el.dataset.cat;document.querySelectorAll('[data-cat]').forEach(e=>e.classList.toggle('active',e===el));}
+function selTemp(el){sTemp=el.dataset.temp;document.querySelectorAll('[data-temp]').forEach(e=>{e.className='sel-opt';if(e===el)e.classList.add(sTemp==='hot'?'hot':sTemp==='cold'?'cold':'warm');});}
+function selPub(el){sPub=el.dataset.pub;document.querySelectorAll('[data-pub]').forEach(e=>e.classList.toggle('active',e===el));}
+function selColor(el){sColor=el.dataset.color;document.querySelectorAll('.color-opt').forEach(e=>e.classList.toggle('on',e===el));}
+function setDur(el){document.querySelectorAll('[data-dur]').forEach(e=>e.classList.toggle('active',e===el));document.getElementById('rel-date').value=addDays(parseInt(el.dataset.dur));}
+
+// ════════════════════════════════════════
+//  FILL ZONE DROPDOWNS
+// ════════════════════════════════════════
+function fillZoneDropdowns(){
+  const opts='<option value="">— Aucune —</option>'+zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('');
+  ['f-zone','v-zone','m-zone','r-zone','po-zone','rel-zone'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){const cur=el.value;el.innerHTML=id==='rel-zone'?'<option value="">Toutes zones</option>'+zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join(''):opts;el.value=cur;}
+  });
+}
+
+// ════════════════════════════════════════
+//  SHEETS
+// ════════════════════════════════════════
+function openOv(t){openOvWith(t,null);}
+function openOvWith(type,id){
+  fillZoneDropdowns();
+  if(type==='contact'){
+    editId=id;
+    document.getElementById('sh-c-t').textContent=id?'Modifier':'Nouveau contact';
+    document.getElementById('btn-del-c').style.display=id?'block':'none';
+    const c=id?contacts.find(x=>x.id===id)||{}:{};
+    ['name','addr','tel','price','followup','notes'].forEach(k=>document.getElementById('f-'+k).value=c[k]||'');
+    document.getElementById('f-zone').value=c.zone||'';
+    document.getElementById('f-status').value=c.status||'new';
+    document.getElementById('f-source').value=c.source||'Pige PAP';
+    sCat=c.cat||'vendeur';sTemp=c.temp||'warm';
+    setTimeout(()=>{
+      document.querySelectorAll('[data-cat]').forEach(e=>e.classList.toggle('active',e.dataset.cat===sCat));
+      document.querySelectorAll('[data-temp]').forEach(e=>{e.className='sel-opt';if(e.dataset.temp===sTemp)e.classList.add(sTemp==='hot'?'hot':sTemp==='cold'?'cold':'warm');});
+    },50);
+    document.getElementById('ov-contact').classList.remove('h');
+    setTimeout(()=>document.getElementById('f-name').focus(),200);
+  }else if(type==='vente'){
+    editVId=id;
+    document.getElementById('sh-v-t').textContent=id?'Modifier':'Bien repéré';
+    document.getElementById('btn-del-v').style.display=id?'block':'none';
+    const v=id?ventes.find(x=>x.id===id)||{}:{};
+    ['addr','price','agence','followup','notes'].forEach(k=>document.getElementById('v-'+k).value=v[k]||'');
+    document.getElementById('v-type').value=v.type||'pap';
+    document.getElementById('v-zone').value=v.zone||'';
+    document.getElementById('ov-vente').classList.remove('h');
+    setTimeout(()=>document.getElementById('v-addr').focus(),200);
+  }else if(type==='mandat'){
+    editMId=id;
+    document.getElementById('sh-m-t').textContent=id?'Modifier':'Nouveau mandat';
+    document.getElementById('btn-del-m').style.display=id?'block':'none';
+    const mn=id?mandats.find(x=>x.id===id)||{}:{};
+    ['addr','surface','rooms','floor','price','fees','start','end','url','owner','tel','notes'].forEach(k=>document.getElementById('m-'+k).value=mn[k]||'');
+    document.getElementById('m-typeM').value=mn.typeM||'exclusif';
+    document.getElementById('m-typeB').value=mn.typeB||'appartement';
+    document.getElementById('m-zone').value=mn.zone||'';
+    document.getElementById('m-status').value=mn.status||'actif';
+    if(!id)document.getElementById('m-start').value=today();
+    document.getElementById('ov-mandat').classList.remove('h');
+    setTimeout(()=>document.getElementById('m-addr').focus(),200);
+  }else if(type==='rue'){
+    editRId=id;
+    document.getElementById('sh-r-t').textContent=id?'Modifier tracé':'Nommer la rue';
+    document.getElementById('btn-del-r').style.display=id?'block':'none';
+    const r=id?rues.find(x=>x.id===id)||{}:{};
+    document.getElementById('r-name').value=r.name||'';
+    document.getElementById('r-zone').value=r.zone||'';
+    document.getElementById('r-type').value=r.type||'boitage';
+    document.getElementById('r-date').value=r.date||today();
+    document.getElementById('r-notes').value=r.notes||'';
+    sPub=r.pub||'flyer';
+    setTimeout(()=>document.querySelectorAll('[data-pub]').forEach(e=>e.classList.toggle('active',e.dataset.pub===sPub)),50);
+    document.getElementById('ov-rue').classList.remove('h');
+    setTimeout(()=>document.getElementById('r-name').focus(),200);
+  }else if(type==='porte'){
+    editPId=id;
+    document.getElementById('sh-p-t').textContent=id?'Modifier fiche':'Fiche porte';
+    document.getElementById('btn-del-p').style.display=id?'block':'none';
+    const p=id?portes.find(x=>x.id===id)||{}:{};
+    ['addr','owner','tel','notes'].forEach(k=>document.getElementById('po-'+k).value=p[k]||'');
+    document.getElementById('po-next').value=p.nextVisit||'';
+    document.getElementById('po-zone').value=p.zone||'';
+    document.getElementById('po-status').value=p.status||'never';
+    document.getElementById('ov-porte').classList.remove('h');
+    setTimeout(()=>document.getElementById('po-addr').focus(),200);
+  }else if(type==='zone'){
+    editZId=id;
+    const z=id?zones.find(x=>x.id===id)||{}:{};
+    document.getElementById('sh-z-t').textContent=id?'Modifier la zone':'Nommer la zone';
+    document.getElementById('z-name').value=z.name||'';
+    document.getElementById('z-notes').value=z.notes||'';
+    document.getElementById('btn-del-z').style.display=id?'block':'none';
+    document.getElementById('btn-save-z').style.display=!id&&zonePts.length<3?'none':'block';
+    sColor=z.color||ZONE_COLORS[zones.length%ZONE_COLORS.length];
+    setTimeout(()=>{document.querySelectorAll('.color-opt').forEach(e=>e.classList.toggle('on',e.dataset.color===sColor));},50);
+    if(id){
+      const pts=z.pts||[];
+      document.getElementById('z-pts-info').textContent=`Zone existante · ${pts.length} points. Modifier le nom/couleur puis enregistrer.`;
+    }else{
+      document.getElementById('z-pts-info').textContent=`${zonePts.length} point${zonePts.length>1?'s':''} tracés.`;
+    }
+    document.getElementById('ov-zone').classList.remove('h');
+    setTimeout(()=>document.getElementById('z-name').focus(),200);
+  }else if(type==='relance'){
+    document.getElementById('rel-name').value='';document.getElementById('rel-date').value='';
+    document.getElementById('rel-notes').value='';document.getElementById('rel-zone').value='';
+    document.querySelectorAll('[data-dur]').forEach(e=>e.classList.remove('active'));
+    document.getElementById('ov-relance').classList.remove('h');
+    setTimeout(()=>document.getElementById('rel-name').focus(),200);
+  }else if(type==='install'){
+    document.getElementById('ov-install').classList.remove('h');
+  }
+}
+function closeOv(type){
+  document.getElementById('ov-'+type).classList.add('h');
+  if(type==='contact'){editId=null;pendingLL=null;}
+  else if(type==='vente'){editVId=null;pendingLL=null;}
+  else if(type==='mandat'){editMId=null;pendingLL=null;}
+  else if(type==='rue'){editRId=null;if(rueDrawLine){rueDrawLine.remove();rueDrawLine=null;}ruePts=[];}
+  else if(type==='porte'){editPId=null;pendingLL=null;}
+  else if(type==='zone'){editZId=null;clearZoneDraft();}
+}
+
+// ════════════════════════════════════════
+//  SAVE / DELETE
+// ════════════════════════════════════════
+function saveContact(){
+  const d={name:document.getElementById('f-name').value||'Contact sans nom',addr:document.getElementById('f-addr').value||'',zone:document.getElementById('f-zone').value,cat:sCat,temp:sTemp,status:document.getElementById('f-status').value,source:document.getElementById('f-source').value,followup:document.getElementById('f-followup').value,tel:document.getElementById('f-tel').value,price:parseInt(document.getElementById('f-price').value)||0,notes:document.getElementById('f-notes').value};
+  if(editId){const i=contacts.findIndex(x=>x.id===editId);if(i>=0)contacts[i]={...contacts[i],...d};}
+  else if(pendingLL)contacts.push({id:uid(),lat:pendingLL.lat,lng:pendingLL.lng,...d});
+  saveC();closeOv('contact');renderContactMarkers();updateBadge();
+  if(curView==='stats')renderStats();if(curView==='contacts')renderContacts();if(curView==='relances')renderRelances();
+}
+function deleteContact(){if(!editId||!confirm('Supprimer ?'))return;contacts=contacts.filter(x=>x.id!==editId);saveC();closeOv('contact');renderContactMarkers();updateBadge();}
+
+function saveVente(){
+  const d={addr:document.getElementById('v-addr').value||'Adresse inconnue',type:document.getElementById('v-type').value,zone:document.getElementById('v-zone').value,price:parseInt(document.getElementById('v-price').value)||0,agence:document.getElementById('v-agence').value,followup:document.getElementById('v-followup').value,notes:document.getElementById('v-notes').value};
+  if(editVId){const i=ventes.findIndex(x=>x.id===editVId);if(i>=0)ventes[i]={...ventes[i],...d};}
+  else if(pendingLL)ventes.push({id:uid(),lat:pendingLL.lat,lng:pendingLL.lng,...d});
+  saveV();closeOv('vente');renderVenteMarkers();updateBadge();
+  if(curView==='stats')renderStats();if(curView==='relances')renderRelances();
+}
+function deleteVente(){if(!editVId||!confirm('Supprimer ?'))return;ventes=ventes.filter(x=>x.id!==editVId);saveV();closeOv('vente');renderVenteMarkers();updateBadge();}
+
+function saveMandat(){
+  const d={addr:document.getElementById('m-addr').value||'',typeM:document.getElementById('m-typeM').value,typeB:document.getElementById('m-typeB').value,surface:document.getElementById('m-surface').value,rooms:document.getElementById('m-rooms').value,floor:document.getElementById('m-floor').value,price:parseInt(document.getElementById('m-price').value)||0,fees:parseFloat(document.getElementById('m-fees').value)||0,start:document.getElementById('m-start').value,end:document.getElementById('m-end').value,url:document.getElementById('m-url').value,owner:document.getElementById('m-owner').value,tel:document.getElementById('m-tel').value,zone:document.getElementById('m-zone').value,status:document.getElementById('m-status').value,notes:document.getElementById('m-notes').value};
+  if(editMId){const i=mandats.findIndex(x=>x.id===editMId);if(i>=0)mandats[i]={...mandats[i],...d};}
+  else if(pendingLL)mandats.push({id:uid(),lat:pendingLL.lat,lng:pendingLL.lng,...d});
+  saveM();closeOv('mandat');renderMandatMarkers();updateBadge();
+  if(curView==='mandats')renderMandats();if(curView==='stats')renderStats();if(curView==='relances')renderRelances();
+}
+function deleteMandat(){if(!editMId||!confirm('Supprimer ?'))return;mandats=mandats.filter(x=>x.id!==editMId);saveM();closeOv('mandat');renderMandatMarkers();updateBadge();}
+
+function saveRue(){
+  const d={name:document.getElementById('r-name').value||'Rue sans nom',zone:document.getElementById('r-zone').value,type:document.getElementById('r-type').value,pub:sPub,date:document.getElementById('r-date').value,notes:document.getElementById('r-notes').value};
+  if(editRId){const i=rues.findIndex(x=>x.id===editRId);if(i>=0)rues[i]={...rues[i],...d};}
+  else if(ruePts.length>=2)rues.push({id:uid(),points:[...ruePts],...d});
+  if(rueDrawLine){rueDrawLine.remove();rueDrawLine=null;}ruePts=[];
+  saveR();closeOv('rue');renderRueLines();
+  if(curView==='rues')renderRues();if(curView==='stats')renderStats();
+}
+function deleteRue(){if(!editRId||!confirm('Supprimer ?'))return;rues=rues.filter(x=>x.id!==editRId);saveR();closeOv('rue');renderRueLines();if(curView==='rues')renderRues();}
+
+function savePorte(){
+  const d={addr:document.getElementById('po-addr').value||'',owner:document.getElementById('po-owner').value,tel:document.getElementById('po-tel').value,nextVisit:document.getElementById('po-next').value,zone:document.getElementById('po-zone').value,status:document.getElementById('po-status').value,notes:document.getElementById('po-notes').value};
+  if(editPId){const i=portes.findIndex(x=>x.id===editPId);if(i>=0)portes[i]={...portes[i],...d};}
+  else if(pendingLL)portes.push({id:uid(),lat:pendingLL.lat,lng:pendingLL.lng,...d});
+  saveP();closeOv('porte');renderPorteMarkers();updateBadge();
+  if(curView==='portes')renderPortes();if(curView==='stats')renderStats();
+}
+function deletePorte(){if(!editPId||!confirm('Supprimer ?'))return;portes=portes.filter(x=>x.id!==editPId);saveP();closeOv('porte');renderPorteMarkers();updateBadge();}
+
+function saveZone(){
+  const name=document.getElementById('z-name').value.trim();
+  if(!name){alert('Donnez un nom à la zone.');return;}
+  if(editZId){
+    // Modify existing
+    const i=zones.findIndex(x=>x.id===editZId);
+    if(i>=0){zones[i]={...zones[i],name,color:sColor,notes:document.getElementById('z-notes').value};}
+  }else{
+    if(zonePts.length<3){alert('Dessinez au moins 3 points.');return;}
+    zones.push({id:uid(),name,color:sColor,pts:[...zonePts],notes:document.getElementById('z-notes').value});
+  }
+  saveZ();closeOv('zone');renderZonePolys();fillZoneDropdowns();
+  if(curView==='zones')renderZones();if(curView==='stats')renderStats();
+}
+function deleteZone(){
+  if(!editZId||!confirm('Supprimer cette zone ? Les éléments attachés ne seront pas supprimés.'))return;
+  zones=zones.filter(x=>x.id!==editZId);
+  saveZ();closeOv('zone');renderZonePolys();fillZoneDropdowns();
+  if(curView==='zones')renderZones();if(curView==='stats')renderStats();
+}
+
+function saveRelanceProg(){
+  const name=document.getElementById('rel-name').value||'Relance sans nom';
+  const date=document.getElementById('rel-date').value;
+  if(!date){alert('Choisissez une date.');return;}
+  relancesProg.push({id:uid(),name,date,zone:document.getElementById('rel-zone').value,notes:document.getElementById('rel-notes').value,done:false});
+  saveRP();closeOv('relance');updateBadge();if(curView==='relances')renderRelances();
+}
+function markRPDone(id){relancesProg=relancesProg.map(r=>r.id===id?{...r,done:true}:r);saveRP();updateBadge();if(curView==='relances')renderRelances();}
+function delRP(id){relancesProg=relancesProg.filter(r=>r.id!==id);saveRP();updateBadge();if(curView==='relances')renderRelances();}
+
+// ════════════════════════════════════════
+//  FOCUS HELPERS
+// ════════════════════════════════════════
+function setFilter(f){activeFilter=f;renderContacts();}
+function focusContact(id){const c=contacts.find(x=>x.id===id);if(!c)return;showView('map');setTimeout(()=>{map.setView([c.lat,c.lng],18);if(cMk[id])setTimeout(()=>cMk[id].openPopup(),300);},100);}
+function focusMandat(id){const mn=mandats.find(x=>x.id===id);if(!mn)return;showView('map');setTimeout(()=>{map.setView([mn.lat,mn.lng],18);if(mMk[id])setTimeout(()=>mMk[id].openPopup(),300);},100);}
+function focusVente(id){const v=ventes.find(x=>x.id===id);if(!v)return;showView('map');setTimeout(()=>{map.setView([v.lat,v.lng],18);if(vMk[id])setTimeout(()=>vMk[id].openPopup(),300);},100);}
+function focusPorte(id){const p=portes.find(x=>x.id===id);if(!p)return;showView('map');setTimeout(()=>{map.setView([p.lat,p.lng],19);if(pMk[id])setTimeout(()=>pMk[id].openPopup(),300);},100);}
+function focusZone(id){
+  const z=zones.find(x=>x.id===id);if(!z)return;showView('map');
+  setTimeout(()=>{
+    const poly=zPoly[id];
+    if(poly){try{map.fitBounds(poly.getBounds(),{padding:[40,40]});return;}catch(e){}}
+    map.setView(z.pts&&z.pts[0]?z.pts[0]:[43.262,5.4],14);
+  },100);
+}
+
+// ════════════════════════════════════════
+//  NOTIFICATIONS
+// ════════════════════════════════════════
+function checkNotifs(){
+  const td=today();
+  const n=contacts.filter(c=>c.followup&&c.followup<=td&&c.status!=='mandat').length
+    +ventes.filter(v=>v.followup&&v.followup<=td).length
+    +relancesProg.filter(r=>!r.done&&r.date&&r.date<=td).length
+    +portes.filter(p=>p.nextVisit&&p.nextVisit<=td&&p.status!=='mandat').length;
+  const expM=mandats.filter(mn=>mn.end&&daysDiff(mn.end)<=7&&daysDiff(mn.end)>=0).length;
+  const stale=rues.filter(r=>r.date&&daysAgo(r.date)>STALE&&r.type!=='todo').length;
+  const msgs=[];
+  if(n>0)msgs.push(`${n} relance${n>1?'s':''} en attente`);
+  if(expM>0)msgs.push(`⚠ ${expM} mandat${expM>1?'s':''} expire bientôt`);
+  if(stale>0)msgs.push(`${stale} rue${stale>1?'s':''} à re-prospecter`);
+  if(msgs.length){
+    document.getElementById('nb-t').textContent=msgs[0];
+    document.getElementById('nb-s').textContent=msgs.slice(1).join(' · ')||'';
+    document.getElementById('notif-bar').style.display='flex';
+  }
+  updateBadge();
+}
+function closeNotif(){document.getElementById('notif-bar').style.display='none';}
+
+// ════════════════════════════════════════
+//  BADGE
+// ════════════════════════════════════════
+function updateBadge(){
+  const td=today();
+  const n=contacts.filter(c=>c.followup&&c.followup<=td&&c.status!=='mandat').length+ventes.filter(v=>v.followup&&v.followup<=td).length+relancesProg.filter(r=>!r.done&&r.date&&r.date<=td).length;
+  const rb=document.getElementById('rel-badge');rb.textContent=n;rb.style.display=n?'inline':'none';
+  const mct=mandats.filter(mn=>mn.status==='actif').length;
+  const mb=document.getElementById('mandat-badge');mb.textContent=mct;mb.style.display=mct?'inline':'none';
+  const lp=portes.filter(p=>p.nextVisit&&p.nextVisit<=td&&p.status!=='mandat').length;
+  const pb=document.getElementById('porte-badge');pb.textContent=lp;pb.style.display=lp?'inline':'none';
+}
+
+// ════════════════════════════════════════
+//  EXPORT / IMPORT
+// ════════════════════════════════════════
+function exportCSV(){
+  if(!contacts.length){alert('Aucun contact.');return;}
+  const h=['Nom','Adresse','Zone','Catégorie','Temp.','Statut','Source','Relance','Tél','Prix','Notes'];
+  const rows=contacts.map(c=>[c.name,c.addr,zones.find(z=>z.id===c.zone)?.name||'',CAT[c.cat]?.l||'',c.temp,ST[c.status]?.l||'',c.source,c.followup,c.tel,c.price,c.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
+  dl('\uFEFF'+[h,...rows].map(r=>r.join(',')).join('\n'),'contacts_jeff.csv','text/csv');
+}
+function exportMandats(){
+  if(!mandats.length){alert('Aucun mandat.');return;}
+  const h=['Adresse','Type','Bien','Surface','Pièces','Prix','Honoraires%','Début','Fin','Statut','Propriétaire','Tél','Annonce','Zone','Notes'];
+  const rows=mandats.map(mn=>[mn.addr,mn.typeM,mn.typeB,mn.surface,mn.rooms,mn.price,mn.fees,mn.start,mn.end,MS[mn.status]?.l||'',mn.owner,mn.tel,mn.url,zones.find(z=>z.id===mn.zone)?.name||'',mn.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
+  dl('\uFEFF'+[h,...rows].map(r=>r.join(',')).join('\n'),'mandats_jeff.csv','text/csv');
+}
+function exportJSON(){dl(JSON.stringify({contacts,rues,ventes,mandats,relancesProg,portes,zones,exportedAt:new Date().toISOString()},null,2),'sauvegarde_jeff_'+today()+'.json','application/json');}
+function doImport(e){
+  const f=e.target.files[0];if(!f)return;
+  const fr=new FileReader();
+  fr.onload=ev=>{try{
+    const d=JSON.parse(ev.target.result);
+    if(d.contacts)contacts=d.contacts;if(d.rues)rues=d.rues;if(d.ventes)ventes=d.ventes;
+    if(d.mandats)mandats=d.mandats;if(d.relancesProg)relancesProg=d.relancesProg;
+    if(d.portes)portes=d.portes;if(d.zones)zones=d.zones;
+    saveC();saveR();saveV();saveM();saveRP();saveP();saveZ();
+    renderAll();fillZoneDropdowns();updateBadge();
+    alert(`Import OK : ${contacts.length} contacts, ${mandats.length} mandats, ${zones.length} zones.`);
+  }catch{alert('Fichier invalide.');}};
+  fr.readAsText(f);
+}
+function dl(c,n,t){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=n;a.click();}
+function resetAll(){
+  if(!confirm('Effacer TOUTES les données ?'))return;
+  if(!confirm('Confirmation finale — action irréversible.'))return;
+  contacts=[];rues=[];ventes=[];mandats=[];relancesProg=[];portes=[];zones=[];
+  saveC();saveR();saveV();saveM();saveRP();saveP();saveZ();
+  renderAll();fillZoneDropdowns();updateBadge();showView('map');
+}
+
+// ════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════
+const sEl=document.createElement('style');
+sEl.textContent=`@keyframes pulse{0%,100%{box-shadow:0 2px 8px rgba(185,28,28,.3)}50%{box-shadow:0 0 0 8px rgba(185,28,28,.1)}}@keyframes pulse2{0%,100%{box-shadow:0 2px 8px rgba(161,98,7,.3)}50%{box-shadow:0 0 0 6px rgba(161,98,7,.12)}}@keyframes pulse3{0%,100%{box-shadow:0 2px 8px rgba(124,58,237,.3)}50%{box-shadow:0 0 0 6px rgba(124,58,237,.12)}}@keyframes slidedown{from{transform:translateY(-100%)}to{transform:translateY(0)}}`;
+document.head.appendChild(sEl);
+
+// Boot async — attendre loadAll (IndexedDB) avant d'afficher
+(async()=>{
+  await loadAll();
+  initMap();
+  showView('map');
+  fillZoneDropdowns();
+  updateBadge();
+  setTimeout(checkNotifs,1500);
+})();
+if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)&&!window.navigator.standalone)setTimeout(()=>document.getElementById('tip').style.display='flex',7000);
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.search-pill')&&!e.target.closest('#search-results'))document.getElementById('search-results').style.display='none';
+});
+
+// Sauvegarde de sécurité à la fermeture / mise en arrière-plan
+async function saveAll(){
+  const saves=[saveC(),saveR(),saveV(),saveM(),saveRP(),saveP(),saveZ()];
+  await Promise.all(saves);
+}
+window.addEventListener('beforeunload',()=>{
+  // Sauvegarde synchrone localStorage en secours
+  for(const[k,name]of Object.entries(DATA_MAP)){
+    try{localStorage.setItem(SK[k],JSON.stringify(window[name]||[]));}catch(e){}
+  }
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden')saveAll();
+});
+</script>
+</body>
+</html>
