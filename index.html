@@ -361,6 +361,8 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
     <div class="mc-sep"></div>
     <button class="mc" id="heat-btn" onclick="toggleHeatmap()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg><span class="tt">Heatmap</span></button>
     <div class="mc-sep"></div>
+    <button class="mc" id="track-btn" onclick="toggleLiveTracking()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg><span class="tt">Suivi position</span></button>
+    <div class="mc-sep"></div>
     <button class="mc" onclick="showView('config')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg><span class="tt">Paramètres</span></button>
   </div>
 
@@ -720,6 +722,7 @@ let editId=null,editRId=null,editVId=null,editMId=null,editPId=null,editZId=null
 let pendingLL=null,ruePts=[],rueDrawLine=null,zonePts=[],zoneDrawLine=null,zoneDots=[];
 let mode=null,activeFilter='all',activePFilter='all',activeMFilter='all',curView='map';
 let osmLayer,satLayer,satOn=false,myLocMk=null,heatLayer=null;
+let myLocAccuracy=null,liveTrackId=null;
 let sCat='vendeur',sTemp='warm',sPub='flyer',sColor='#2563eb';
 let srchTimer=null,fabOpen=false;
 
@@ -1118,6 +1121,35 @@ function geolocate(){
       map.setView(ll,17);},
     ()=>alert('Position indisponible. Vérifiez les autorisations.'),
     {enableHighAccuracy:true,timeout:10000}
+  );
+}
+
+// Suivi en direct (bouton dédié dans les contrôles carte) — distinct de
+// geolocate() ci-dessus qui reste un centrage ponctuel.
+function toggleLiveTracking(){
+  const btn=document.getElementById('track-btn');
+  if(liveTrackId){
+    navigator.geolocation.clearWatch(liveTrackId);
+    liveTrackId=null;
+    btn.classList.remove('on');
+    if(myLocMk){myLocMk.remove();myLocMk=null;}
+    if(myLocAccuracy){myLocAccuracy.remove();myLocAccuracy=null;}
+    return;
+  }
+  if(!navigator.geolocation){alert('Géolocalisation non disponible sur cet appareil.');return;}
+  btn.classList.add('on');
+  let firstFix=true;
+  liveTrackId=navigator.geolocation.watchPosition(
+    p=>{
+      const ll=[p.coords.latitude,p.coords.longitude];
+      if(myLocMk)myLocMk.remove();
+      if(myLocAccuracy)myLocAccuracy.remove();
+      myLocAccuracy=L.circle(ll,{radius:p.coords.accuracy,color:'#1e56a0',weight:1,fillColor:'#1e56a0',fillOpacity:.1,interactive:false}).addTo(map);
+      myLocMk=L.circleMarker(ll,{radius:8,fillColor:'#1e56a0',fillOpacity:1,color:'#fff',weight:3}).addTo(map);
+      if(firstFix){map.setView(ll,18);firstFix=false;}
+    },
+    ()=>{alert('Position indisponible. Vérifiez les autorisations de localisation.');toggleLiveTracking();},
+    {enableHighAccuracy:true,maximumAge:5000,timeout:15000}
   );
 }
 
