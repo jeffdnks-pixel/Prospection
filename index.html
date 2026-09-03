@@ -730,6 +730,10 @@ let srchTimer=null,fabOpen=false;
 //  UTILS
 // ════════════════════════════════════════
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+// Lien Street View (gratuit, sans clé API) — Google recentre automatiquement
+// sur le panorama le plus proche de ces coordonnées.
+const svUrl=(lat,lng)=>`https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
+const svBtn=(lat,lng)=>`<a href="${svUrl(lat,lng)}" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;padding:9px;background:var(--bg2);color:var(--text2);border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">🧭 Street View</a>`;
 const today=()=>new Date().toISOString().slice(0,10);
 const fmtD=d=>{if(!d)return'';const[y,m,j]=d.split('-');return`${j}/${m}/${y}`;};
 const daysAgo=d=>Math.floor((Date.now()-new Date(d))/(864e5));
@@ -921,7 +925,10 @@ function renderContactMarkers(){
       ${c.tel?`<div><a href="tel:${c.tel}" style="font-size:12px;color:#1e56a0;font-weight:700">📞 ${c.tel}</a></div>`:''}
       ${c.followup?`<div style="font-size:11px;color:${late?'#b91c1c':'#64748b'};margin-top:3px">${late?'⚠ Retard':'🔔'} ${fmtD(c.followup)}</div>`:''}
       ${c.notes?`<div style="font-size:11px;color:#64748b;font-style:italic;margin-top:4px">"${c.notes.slice(0,60)}…"</div>`:''}
-      <button onclick="_eC('${c.id}')" style="width:100%;padding:9px;margin-top:8px;background:#1e56a0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        ${svBtn(c.lat,c.lng)}
+        <button onclick="_eC('${c.id}')" style="flex:1;padding:9px;background:#1e56a0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      </div>
     </div>`,{maxWidth:260});
     cMk[c.id]=m;
   });
@@ -942,7 +949,10 @@ function renderVenteMarkers(){
       <div style="font-size:14px;font-weight:800;margin-bottom:4px">📍 ${v.addr}</div>
       ${v.price>0?`<div style="font-size:13px;margin-bottom:4px">💰 ${Number(v.price).toLocaleString('fr-FR')} €</div>`:''}
       ${v.followup?`<div style="font-size:11px;color:#64748b;margin-bottom:5px">🔔 ${fmtD(v.followup)}</div>`:''}
-      <button onclick="_eV('${v.id}')" style="width:100%;padding:9px;background:${col};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      <div style="display:flex;gap:6px">
+        ${svBtn(v.lat,v.lng)}
+        <button onclick="_eV('${v.id}')" style="flex:1;padding:9px;background:${col};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      </div>
     </div>`,{maxWidth:240});
     vMk[v.id]=m;
   });
@@ -969,7 +979,10 @@ function renderMandatMarkers(){
       ${d!==null?`<div style="font-size:11px;color:${d<0?'#94a3b8':d<=7?'#b91c1c':d<=14?'#c2410c':'#64748b'};font-weight:700;margin:3px 0">${d<0?'Expiré':d===0?'Expire auj.':d<=14?`⚠ Expire dans ${d}j`:`Valide ${d}j`}</div>`:''}
       ${mn.url?`<a href="${mn.url}" target="_blank" style="display:block;font-size:12px;color:#7c3aed;font-weight:700;margin:4px 0">🔗 Voir l'annonce</a>`:''}
       ${mn.tel?`<a href="tel:${mn.tel}" style="display:block;font-size:12px;color:#1e56a0;font-weight:700">📞 ${mn.tel}</a>`:''}
-      <button onclick="_eM('${mn.id}')" style="width:100%;padding:9px;margin-top:8px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        ${svBtn(mn.lat,mn.lng)}
+        <button onclick="_eM('${mn.id}')" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      </div>
     </div>`,{maxWidth:260});
     mMk[mn.id]=m;
   });
@@ -992,7 +1005,10 @@ function renderPorteMarkers(){
       ${p.owner?`<div style="font-size:12px;color:#64748b">👤 ${p.owner}${p.tel?` · <a href="tel:${p.tel}" style="color:#1e56a0;font-weight:700">${p.tel}</a>`:''}</div>`:''}
       ${p.nextVisit?`<div style="font-size:11px;color:${late?'#b91c1c':'#64748b'};margin-top:3px">${late?'⚠ Passage en retard':'📅'} ${fmtD(p.nextVisit)}</div>`:''}
       ${p.notes?`<div style="font-size:11px;color:#64748b;font-style:italic;margin-top:4px">"${p.notes.slice(0,60)}"</div>`:''}
-      <button onclick="_eP('${p.id}')" style="width:100%;padding:9px;margin-top:8px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier fiche</button>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        ${svBtn(p.lat,p.lng)}
+        <button onclick="_eP('${p.id}')" style="flex:1;padding:9px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
+      </div>
     </div>`,{maxWidth:250});
     pMk[p.id]=m;
   });
