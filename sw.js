@@ -4,7 +4,7 @@
 // elles nécessitent toujours une connexion active. C'est volontaire — voir
 // l'audit technique pour le détail des raisons (politique d'usage des tuiles).
 
-const CACHE_NAME = 'prospectum-shell-v1';
+const CACHE_NAME = 'prospectum-shell-v2';
 const SHELL_URLS = [
   './',
   './index.html',
@@ -13,6 +13,9 @@ const SHELL_URLS = [
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js',
   'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js'
 ];
 

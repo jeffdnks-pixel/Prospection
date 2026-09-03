@@ -10,8 +10,11 @@
 <link rel="manifest" href="manifest.json">
 <title>Jeff · Prospection</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -597,6 +600,13 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
     <div class="sh-head"><span class="sh-t" id="sh-p-t">Fiche porte</span><button class="sh-x" onclick="closeOv('porte')">×</button></div>
     <div class="sh-body">
       <label class="fl">Adresse / Description</label><input class="fi" id="po-addr" placeholder="ex : 12 Bd Petit Nice, bât B, RdC G">
+      <label class="fl">Photo de la façade</label>
+      <img id="po-photo-preview" style="display:none;width:100%;max-height:170px;object-fit:cover;border-radius:var(--rsm);margin-bottom:6px">
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn-s" style="flex:1" onclick="document.getElementById('po-photo-input').click()">📷 Prendre une photo</button>
+        <button type="button" class="btn-s" id="po-photo-remove" style="display:none;flex:0 0 auto;color:var(--red)" onclick="removePortePhoto()">🗑</button>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="po-photo-input" style="display:none" onchange="handlePortePhoto(event)">
       <label class="fl">Statut</label>
       <select class="fi" id="po-status">
         <option value="never">⬜ Jamais contacté</option><option value="refuse">🚫 Refus</option>
@@ -691,6 +701,21 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
   </div>
 </div>
 
+<!-- TOURNÉE DU JOUR -->
+<div class="ov h" id="ov-tour">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh-head"><span class="sh-t">🧭 Tournée du jour</span><button class="sh-x" onclick="closeOv('tour')">×</button></div>
+    <div class="sh-body">
+      <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px">Trie les portes "à faire" par proximité, à partir de ta position actuelle. Distance à vol d'oiseau — pas un itinéraire piéton précis.</div>
+      <label class="fl">Zone (optionnel)</label>
+      <select class="fi" id="tour-zone"><option value="">Toutes les zones</option></select>
+      <button class="btn-p" style="width:100%;margin-top:12px" onclick="generateTour()">Générer ma tournée</button>
+      <div id="tour-result" style="margin-top:16px"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════
 //  CONSTANTES
@@ -723,6 +748,9 @@ let pendingLL=null,ruePts=[],rueDrawLine=null,zonePts=[],zoneDrawLine=null,zoneD
 let mode=null,activeFilter='all',activePFilter='all',activeMFilter='all',curView='map';
 let osmLayer,satLayer,satOn=false,myLocMk=null,heatLayer=null;
 let myLocAccuracy=null,liveTrackId=null;
+// Regroupement de marqueurs — évite l'illisibilité quand plusieurs contacts/
+// portes se trouvent au même immeuble. Se sépare automatiquement au zoom.
+let contactCluster,venteCluster,mandatCluster,porteCluster;
 let sCat='vendeur',sTemp='warm',sPub='flyer',sColor='#2563eb';
 let srchTimer=null,fabOpen=false;
 
@@ -734,6 +762,18 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 // sur le panorama le plus proche de ces coordonnées.
 const svUrl=(lat,lng)=>`https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
 const svBtn=(lat,lng)=>`<a href="${svUrl(lat,lng)}" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;padding:9px;background:var(--bg2);color:var(--text2);border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">🧭 Street View</a>`;
+// Icône de regroupement — même langage visuel que les marqueurs individuels
+// (cercle coloré avec le nombre d'éléments empilés au même endroit).
+function clusterIcon(color){
+  return cluster=>{
+    const n=cluster.getChildCount();
+    const size=n<10?30:n<25?36:42;
+    return L.divIcon({
+      html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:${n<25?13:12}px">${n}</div>`,
+      className:'',iconSize:[size,size]
+    });
+  };
+}
 const today=()=>new Date().toISOString().slice(0,10);
 const fmtD=d=>{if(!d)return'';const[y,m,j]=d.split('-');return`${j}/${m}/${y}`;};
 const daysAgo=d=>Math.floor((Date.now()-new Date(d))/(864e5));
@@ -833,6 +873,11 @@ function initMap(){
   satLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20});
   map=L.map('map',{zoomControl:false,attributionControl:false}).setView([43.262,5.400],13);
   osmLayer.addTo(map);
+  const clusterOpts={maxClusterRadius:50,spiderfyOnMaxZoom:true,disableClusteringAtZoom:19,showCoverageOnHover:false,spiderfyDistanceMultiplier:1.5};
+  contactCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#1e56a0')}).addTo(map);
+  venteCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#ef4444')}).addTo(map);
+  mandatCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#7c3aed')}).addTo(map);
+  porteCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#0f172a')}).addTo(map);
   map.on('click',e=>{
     document.getElementById('search-results').style.display='none';
     if(fabOpen)closeFab();
@@ -906,7 +951,7 @@ function clearZoneDraft(){
 //  CONTACT MARKERS
 // ════════════════════════════════════════
 function renderContactMarkers(){
-  Object.values(cMk).forEach(m=>{try{m.remove()}catch(e){}});cMk={};
+  contactCluster.clearLayers();cMk={};
   contacts.forEach(c=>{
     const st=ST[c.status]||ST.new;const cat=CAT[c.cat]||CAT.autre;
     const late=c.followup&&c.followup<=today()&&c.status!=='mandat';
@@ -914,7 +959,7 @@ function renderContactMarkers(){
     const border=c.temp==='hot'?'#ef4444':c.temp==='cold'?'#3b82f6':'#fff';
     const anim=late?';animation:pulse 1.5s infinite':'';
     const icon=L.divIcon({className:'',html:`<div style="width:20px;height:20px;border-radius:50%;background:${col};border:3px solid ${border};box-shadow:0 2px 8px rgba(0,0,0,.3)${anim};display:flex;align-items:center;justify-content:center;font-size:9px">${cat.e}</div>`,iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-13]});
-    const m=L.marker([c.lat,c.lng],{icon}).addTo(map);
+    const m=L.marker([c.lat,c.lng],{icon});
     m.bindPopup(`<div style="min-width:210px;font-family:-apple-system,sans-serif">
       <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:2px">${cat.l}</div>
       <div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:2px">${c.name}</div>
@@ -930,6 +975,7 @@ function renderContactMarkers(){
         <button onclick="_eC('${c.id}')" style="flex:1;padding:9px;background:#1e56a0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
     </div>`,{maxWidth:260});
+    contactCluster.addLayer(m);
     cMk[c.id]=m;
   });
 }
@@ -939,11 +985,11 @@ window._eC=id=>{if(map._popup)map.closePopup();openOvWith('contact',id);};
 //  VENTE MARKERS
 // ════════════════════════════════════════
 function renderVenteMarkers(){
-  Object.values(vMk).forEach(m=>{try{m.remove()}catch(e){}});vMk={};
+  venteCluster.clearLayers();vMk={};
   ventes.forEach(v=>{
     const col=v.type==='pap'?'#f59e0b':'#ef4444';
     const icon=L.divIcon({className:'',html:`<div style="width:22px;height:22px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;animation:pulse2 2s infinite">${v.type==='pap'?'🏠':'🏢'}</div>`,iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-13]});
-    const m=L.marker([v.lat,v.lng],{icon}).addTo(map);
+    const m=L.marker([v.lat,v.lng],{icon});
     m.bindPopup(`<div style="min-width:200px;font-family:-apple-system,sans-serif">
       <div style="font-size:10px;font-weight:800;color:${col};text-transform:uppercase;margin-bottom:4px">${v.type==='pap'?'PAP':'Autre agence'}${v.agence?' · '+v.agence:''}</div>
       <div style="font-size:14px;font-weight:800;margin-bottom:4px">📍 ${v.addr}</div>
@@ -954,6 +1000,7 @@ function renderVenteMarkers(){
         <button onclick="_eV('${v.id}')" style="flex:1;padding:9px;background:${col};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
     </div>`,{maxWidth:240});
+    venteCluster.addLayer(m);
     vMk[v.id]=m;
   });
 }
@@ -963,13 +1010,13 @@ window._eV=id=>{if(map._popup)map.closePopup();openOvWith('vente',id);};
 //  MANDAT MARKERS
 // ════════════════════════════════════════
 function renderMandatMarkers(){
-  Object.values(mMk).forEach(m=>{try{m.remove()}catch(e){}});mMk={};
+  mandatCluster.clearLayers();mMk={};
   mandats.forEach(mn=>{
     const ms=MS[mn.status]||MS.actif;
     const expiring=mn.end&&daysDiff(mn.end)<=14&&daysDiff(mn.end)>=0;
     const anim=expiring?';animation:pulse3 1.8s infinite':'';
     const icon=L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:6px;background:${ms.c};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px${anim}">📋</div>`,iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-14]});
-    const m=L.marker([mn.lat,mn.lng],{icon}).addTo(map);
+    const m=L.marker([mn.lat,mn.lng],{icon});
     const d=mn.end?daysDiff(mn.end):null;
     m.bindPopup(`<div style="min-width:220px;font-family:-apple-system,sans-serif">
       <div style="font-size:10px;font-weight:800;color:#7c3aed;text-transform:uppercase;margin-bottom:3px">MANDAT ${(mn.typeM||'exclusif').toUpperCase()}</div>
@@ -984,6 +1031,7 @@ function renderMandatMarkers(){
         <button onclick="_eM('${mn.id}')" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
     </div>`,{maxWidth:260});
+    mandatCluster.addLayer(m);
     mMk[mn.id]=m;
   });
 }
@@ -993,13 +1041,14 @@ window._eM=id=>{if(map._popup)map.closePopup();openOvWith('mandat',id);};
 //  PORTE MARKERS
 // ════════════════════════════════════════
 function renderPorteMarkers(){
-  Object.values(pMk).forEach(m=>{try{m.remove()}catch(e){}});pMk={};
+  porteCluster.clearLayers();pMk={};
   portes.forEach(p=>{
     const st=PST[p.status]||PST.never;
     const late=p.nextVisit&&p.nextVisit<=today();
     const icon=L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:3px;background:${st.c};border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:8px${late?';animation:pulse 1.5s infinite':''}">${st.e}</div>`,iconSize:[16,16],iconAnchor:[8,8],popupAnchor:[0,-10]});
-    const m=L.marker([p.lat,p.lng],{icon}).addTo(map);
+    const m=L.marker([p.lat,p.lng],{icon});
     m.bindPopup(`<div style="min-width:200px;font-family:-apple-system,sans-serif">
+      ${p.photo?`<img src="${p.photo}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:6px">`:''}
       <span style="font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700;background:${st.bg};color:${st.c}">${st.l}</span>
       <div style="font-size:14px;font-weight:800;margin:5px 0">📍 ${p.addr||'Adresse inconnue'}</div>
       ${p.owner?`<div style="font-size:12px;color:#64748b">👤 ${p.owner}${p.tel?` · <a href="tel:${p.tel}" style="color:#1e56a0;font-weight:700">${p.tel}</a>`:''}</div>`:''}
@@ -1010,6 +1059,7 @@ function renderPorteMarkers(){
         <button onclick="_eP('${p.id}')" style="flex:1;padding:9px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
     </div>`,{maxWidth:250});
+    porteCluster.addLayer(m);
     pMk[p.id]=m;
   });
 }
@@ -1368,9 +1418,10 @@ function renderPortes(){
     byS.forEach(({k,n})=>{if(n)statsH+=`<div style="font-size:12px;color:${PST[k].c};font-weight:700">${PST[k].e} ${n}</div>`;});
     statsH+=`</div></div>`;
   }
-  if(!list.length){el.innerHTML=statsH+`<div class="empty"><div class="empty-ico">🚪</div><div class="empty-t">${portes.length?'Aucun résultat':'Aucune fiche porte'}</div><div class="empty-s">Carte → ＋ → Porte/Adresse</div></div>`;return;}
+  const tourBtn=portes.length?`<button class="btn-s" style="width:100%;margin-bottom:12px" onclick="openTour()">🧭 Générer ma tournée du jour</button>`:'';
+  if(!list.length){el.innerHTML=tourBtn+statsH+`<div class="empty"><div class="empty-ico">🚪</div><div class="empty-t">${portes.length?'Aucun résultat':'Aucune fiche porte'}</div><div class="empty-s">Carte → ＋ → Porte/Adresse</div></div>`;return;}
   const td=today();
-  el.innerHTML=statsH+list.map(p=>{
+  el.innerHTML=tourBtn+statsH+list.map(p=>{
     const st=PST[p.status]||PST.never;const late=p.nextVisit&&p.nextVisit<=td;const z=getZone(p.zone);
     return`<div class="cc" onclick="focusPorte('${p.id}')">
       <div class="cc-sq" style="background:${st.c};border-radius:6px">${st.e}</div>
@@ -1379,6 +1430,7 @@ function renderPortes(){
         ${p.owner?`<div class="cc-addr">👤 ${p.owner}${p.tel?' · '+p.tel:''}</div>`:`<div class="cc-addr" style="color:var(--text3)">Propriétaire non renseigné</div>`}
         <div class="cc-tags">
           <span class="badge" style="background:${st.bg};color:${st.c}">${st.l}</span>
+          ${p.photo?`<span style="font-size:11px">📷</span>`:''}
           ${z?`<span style="font-size:10px;color:${z.color};font-weight:700;background:${z.color}22;padding:2px 6px;border-radius:5px">${z.name}</span>`:''}
           ${p.nextVisit?`<span class="${late?'late-tag':'ok-tag'}">${late?'⚠ En retard':'📅'} ${fmtD(p.nextVisit)}</span>`:''}
         </div>
@@ -1508,6 +1560,34 @@ function gotoRue(id){const r=rues.find(x=>x.id===id);if(!r)return;showView('map'
 // ════════════════════════════════════════
 //  ZONES PANEL
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+//  INTEL ZONE — uniquement pour les zones délimitées, jamais globale.
+//  Chiffres bruts + étiquette, pas de score inventé à faux sens de précision.
+// ════════════════════════════════════════
+function computeZoneIntel(zoneId){
+  const zContacts=contacts.filter(c=>c.zone===zoneId);
+  const zPortes=portes.filter(p=>p.zone===zoneId);
+  const zMandats=mandats.filter(m=>m.zone===zoneId);
+  const zVentes=ventes.filter(v=>v.zone===zoneId);
+  const zRues=rues.filter(r=>r.zone===zoneId&&r.type!=='todo');
+  const total=zContacts.length+zPortes.length+zMandats.length;
+  const neverContacted=zPortes.filter(p=>p.status==='never').length;
+  const hot=zContacts.filter(c=>c.temp==='hot'||c.status==='rdv').length+zMandats.filter(m=>m.status==='actif').length;
+  const covered=zContacts.filter(c=>c.status!=='new').length+zPortes.filter(p=>p.status!=='never').length;
+  const coverageRatio=total?covered/total:null;
+  const competitors=zVentes.length;
+  const lastPassDate=zRues.filter(r=>r.date).sort((a,b)=>a.date<b.date?1:-1)[0]?.date||null;
+  const lastPassDays=lastPassDate?daysAgo(lastPassDate):null;
+  const stale=lastPassDays!==null&&lastPassDays>STALE;
+  let label,color;
+  if(!total&&!zRues.length){label='Zone vide — pas encore prospectée';color='#94a3b8';}
+  else if(hot>=2){label='🔥 Secteur chaud';color='#b91c1c';}
+  else if(coverageRatio!==null&&coverageRatio<0.3){label='🔍 À approfondir — peu d\'infos';color='#1d4ed8';}
+  else if(stale){label='⏰ À repasser — prospection ancienne';color='#c2410c';}
+  else{label='✅ Secteur bien couvert';color='#15803d';}
+  return{total,neverContacted,hot,coverageRatio,competitors,lastPassDays,stale,label,color};
+}
+
 function renderZones(){
   const el=document.getElementById('zones-body');
   if(!zones.length){
@@ -1517,7 +1597,8 @@ function renderZones(){
   el.innerHTML=`<div style="background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1e40af;line-height:1.5">💡 Appuyez sur une zone pour la modifier ou la supprimer. Sur la carte, tapez sur son nom pour l'éditer.</div>`
   +zones.map(z=>{
     const nb=contacts.filter(c=>c.zone===z.id).length+portes.filter(p=>p.zone===z.id).length+rues.filter(r=>r.zone===z.id).length+mandats.filter(m=>m.zone===z.id).length;
-    return`<div class="zone-card" style="background:${z.color}18;border-color:${z.color}44">
+    const intel=computeZoneIntel(z.id);
+    return`<div class="zone-card" style="background:${z.color}18;border-color:${z.color}44;flex-wrap:wrap">
       <div class="zone-swatch" style="background:${z.color}">${z.name.charAt(0).toUpperCase()}</div>
       <div class="zone-body">
         <div class="zone-name">${z.name}</div>
@@ -1527,6 +1608,16 @@ function renderZones(){
       <div class="zone-acts">
         <button class="zone-act-btn" style="background:${z.color}22;color:${z.color}" onclick="focusZone('${z.id}')">📍 Voir</button>
         <button class="zone-act-btn" style="background:var(--bg2);color:var(--text2)" onclick="openOvWith('zone','${z.id}')">✏️</button>
+      </div>
+      <div style="flex-basis:100%;margin-top:8px;padding-top:8px;border-top:1px solid ${z.color}33">
+        <div style="font-size:12px;font-weight:800;color:${intel.color}">${intel.label}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--text2)">
+          ${intel.neverContacted?`<span>🚪 ${intel.neverContacted} jamais contactée${intel.neverContacted>1?'s':''}</span>`:''}
+          ${intel.hot?`<span>🔥 ${intel.hot} chaud${intel.hot>1?'s':''}</span>`:''}
+          ${intel.competitors?`<span>🏁 ${intel.competitors} concurrent${intel.competitors>1?'s':''} repéré${intel.competitors>1?'s':''}</span>`:''}
+          ${intel.coverageRatio!==null?`<span>📊 ${Math.round(intel.coverageRatio*100)}% renseigné</span>`:''}
+          ${intel.lastPassDays!==null?`<span>${intel.stale?'⚠️':'📅'} dernier passage il y a ${intel.lastPassDays}j</span>`:''}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1652,6 +1743,8 @@ function openOvWith(type,id){
     document.getElementById('po-next').value=p.nextVisit||'';
     document.getElementById('po-zone').value=p.zone||'';
     document.getElementById('po-status').value=p.status||'never';
+    poPhotoData=p.photo||null;
+    setPortePhotoPreview();
     document.getElementById('ov-porte').classList.remove('h');
     setTimeout(()=>document.getElementById('po-addr').focus(),200);
   }else if(type==='zone'){
@@ -1733,7 +1826,7 @@ function saveRue(){
 function deleteRue(){if(!editRId||!confirm('Supprimer ?'))return;rues=rues.filter(x=>x.id!==editRId);saveR();closeOv('rue');renderRueLines();if(curView==='rues')renderRues();}
 
 function savePorte(){
-  const d={addr:document.getElementById('po-addr').value||'',owner:document.getElementById('po-owner').value,tel:document.getElementById('po-tel').value,nextVisit:document.getElementById('po-next').value,zone:document.getElementById('po-zone').value,status:document.getElementById('po-status').value,notes:document.getElementById('po-notes').value};
+  const d={addr:document.getElementById('po-addr').value||'',owner:document.getElementById('po-owner').value,tel:document.getElementById('po-tel').value,nextVisit:document.getElementById('po-next').value,zone:document.getElementById('po-zone').value,status:document.getElementById('po-status').value,notes:document.getElementById('po-notes').value,photo:poPhotoData};
   if(editPId){const i=portes.findIndex(x=>x.id===editPId);if(i>=0)portes[i]={...portes[i],...d};}
   else if(pendingLL)portes.push({id:uid(),lat:pendingLL.lat,lng:pendingLL.lng,...d});
   saveP();closeOv('porte');renderPorteMarkers();updateBadge();
@@ -1776,10 +1869,12 @@ function delRP(id){relancesProg=relancesProg.filter(r=>r.id!==id);saveRP();updat
 //  FOCUS HELPERS
 // ════════════════════════════════════════
 function setFilter(f){activeFilter=f;renderContacts();}
-function focusContact(id){const c=contacts.find(x=>x.id===id);if(!c)return;showView('map');setTimeout(()=>{map.setView([c.lat,c.lng],18);if(cMk[id])setTimeout(()=>cMk[id].openPopup(),300);},100);}
-function focusMandat(id){const mn=mandats.find(x=>x.id===id);if(!mn)return;showView('map');setTimeout(()=>{map.setView([mn.lat,mn.lng],18);if(mMk[id])setTimeout(()=>mMk[id].openPopup(),300);},100);}
-function focusVente(id){const v=ventes.find(x=>x.id===id);if(!v)return;showView('map');setTimeout(()=>{map.setView([v.lat,v.lng],18);if(vMk[id])setTimeout(()=>vMk[id].openPopup(),300);},100);}
-function focusPorte(id){const p=portes.find(x=>x.id===id);if(!p)return;showView('map');setTimeout(()=>{map.setView([p.lat,p.lng],19);if(pMk[id])setTimeout(()=>pMk[id].openPopup(),300);},100);}
+// zoomToShowLayer désenchevêtre le marqueur ciblé même s'il est actuellement
+// regroupé avec d'autres (immeuble à plusieurs contacts par ex.)
+function focusContact(id){const c=contacts.find(x=>x.id===id);if(!c||!cMk[id])return;showView('map');setTimeout(()=>{contactCluster.zoomToShowLayer(cMk[id],()=>cMk[id].openPopup());},100);}
+function focusMandat(id){const mn=mandats.find(x=>x.id===id);if(!mn||!mMk[id])return;showView('map');setTimeout(()=>{mandatCluster.zoomToShowLayer(mMk[id],()=>mMk[id].openPopup());},100);}
+function focusVente(id){const v=ventes.find(x=>x.id===id);if(!v||!vMk[id])return;showView('map');setTimeout(()=>{venteCluster.zoomToShowLayer(vMk[id],()=>vMk[id].openPopup());},100);}
+function focusPorte(id){const p=portes.find(x=>x.id===id);if(!p||!pMk[id])return;showView('map');setTimeout(()=>{porteCluster.zoomToShowLayer(pMk[id],()=>pMk[id].openPopup());},100);}
 function focusZone(id){
   const z=zones.find(x=>x.id===id);if(!z)return;showView('map');
   setTimeout(()=>{
@@ -1867,6 +1962,117 @@ function resetAll(){
   saveC();saveR();saveV();saveM();saveRP();saveP();saveZ();
   renderAll();fillZoneDropdowns();updateBadge();showView('map');
 }
+
+// ════════════════════════════════════════
+//  PHOTO FICHE PORTE — capture appareil photo, compression côté client,
+//  stockage local (IndexedDB) uniquement. Aucun upload, aucun cloud.
+// ════════════════════════════════════════
+let poPhotoData=null;
+function setPortePhotoPreview(){
+  const img=document.getElementById('po-photo-preview');
+  const rmBtn=document.getElementById('po-photo-remove');
+  if(poPhotoData){img.src=poPhotoData;img.style.display='block';rmBtn.style.display='block';}
+  else{img.style.display='none';img.src='';rmBtn.style.display='none';}
+}
+function handlePortePhoto(e){
+  const f=e.target.files[0];if(!f)return;
+  e.target.value='';
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxW=900;
+      const scale=Math.min(1,maxW/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=img.width*scale;canvas.height=img.height*scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      poPhotoData=canvas.toDataURL('image/jpeg',0.6);
+      setPortePhotoPreview();
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+function removePortePhoto(){poPhotoData=null;setPortePhotoPreview();}
+
+// ════════════════════════════════════════
+//  TOURNÉE DU JOUR — tri "plus proche voisin" gratuit (calcul local),
+//  pas un vrai itinéraire piéton (ça demanderait un moteur de routing payant).
+// ════════════════════════════════════════
+let tourLine=null,tourMks=[];
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000,toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R*2*Math.asin(Math.sqrt(a));
+}
+function openTour(){
+  document.getElementById('tour-zone').innerHTML='<option value="">Toutes les zones</option>'+zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join('');
+  document.getElementById('tour-result').innerHTML='';
+  document.getElementById('ov-tour').classList.remove('h');
+}
+function generateTour(){
+  const zoneId=document.getElementById('tour-zone').value;
+  let list=portes.filter(p=>p.status==='never'||p.status==='relance');
+  if(zoneId)list=list.filter(p=>p.zone===zoneId);
+  if(!list.length){document.getElementById('tour-result').innerHTML=`<div class="empty"><div class="empty-ico">🧭</div><div class="empty-t">Rien à faire</div><div class="empty-s">Aucune porte "jamais contactée" ou "à relancer" dans cette sélection.</div></div>`;return;}
+  document.getElementById('tour-result').innerHTML='<div style="text-align:center;padding:20px;color:var(--text2);font-size:13px">📍 Récupération de ta position…</div>';
+  if(!navigator.geolocation){buildTour(list,null,null);return;}
+  navigator.geolocation.getCurrentPosition(
+    p=>buildTour(list,p.coords.latitude,p.coords.longitude),
+    ()=>buildTour(list,null,null),
+    {enableHighAccuracy:true,timeout:10000}
+  );
+}
+function buildTour(list,startLat,startLng){
+  const pool=[...list];
+  const ordered=[];
+  let curLat=startLat,curLng=startLng;
+  if(curLat===null){ordered.push(pool.shift());curLat=ordered[0].lat;curLng=ordered[0].lng;}
+  while(pool.length){
+    let bestI=0,bestD=Infinity;
+    pool.forEach((p,i)=>{const d=haversine(curLat,curLng,p.lat,p.lng);if(d<bestD){bestD=d;bestI=i;}});
+    const next=pool.splice(bestI,1)[0];
+    ordered.push(next);curLat=next.lat;curLng=next.lng;
+  }
+  renderTourResult(ordered,startLat,startLng);
+  drawTourOnMap(ordered,startLat,startLng);
+}
+function renderTourResult(ordered,startLat,startLng){
+  let totalM=0,prevLat=startLat,prevLng=startLng;
+  const rows=ordered.map((p,i)=>{
+    let distTxt='';
+    if(prevLat!==null){const d=haversine(prevLat,prevLng,p.lat,p.lng);totalM+=d;distTxt=d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(1)} km`;}
+    prevLat=p.lat;prevLng=p.lng;
+    const st=PST[p.status]||PST.never;
+    return`<div class="cc" onclick="focusPorte('${p.id}');closeOv('tour')">
+      <div class="cc-sq" style="background:#0f172a;color:#fff;font-weight:800;font-size:13px;border-radius:50%">${i+1}</div>
+      <div class="cc-body">
+        <div class="cc-name">${p.addr||'Adresse inconnue'}</div>
+        <div class="cc-tags">
+          <span class="badge" style="background:${st.bg};color:${st.c}">${st.l}</span>
+          ${distTxt?`<span class="ok-tag">↳ ${distTxt}</span>`:''}
+        </div>
+      </div>
+      <div class="cc-arr">›</div></div>`;
+  }).join('');
+  const totalTxt=totalM<1000?`${Math.round(totalM)} m`:`${(totalM/1000).toFixed(1)} km`;
+  document.getElementById('tour-result').innerHTML=
+    `<div style="background:var(--bg2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--text2)">🧭 ${ordered.length} arrêt${ordered.length>1?'s':''} · ~${totalTxt} à vol d'oiseau${startLat===null?' · position de départ indisponible, tournée calculée depuis le 1ᵉʳ arrêt':''}</div>`+rows;
+}
+function drawTourOnMap(ordered,startLat,startLng){
+  clearTour();
+  const pts=[];
+  if(startLat!==null)pts.push([startLat,startLng]);
+  ordered.forEach(p=>pts.push([p.lat,p.lng]));
+  tourLine=L.polyline(pts,{color:'#0f172a',weight:3,dashArray:'2 8',opacity:.8}).addTo(map);
+  ordered.forEach((p,i)=>{
+    const mk=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:`<div style="width:22px;height:22px;border-radius:50%;background:#0f172a;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px">${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map);
+    tourMks.push(mk);
+  });
+  if(pts.length)map.fitBounds(pts,{padding:[40,40]});
+}
+function clearTour(){if(tourLine){tourLine.remove();tourLine=null;}tourMks.forEach(m=>{try{m.remove()}catch(e){}});tourMks=[];}
 
 // ════════════════════════════════════════
 //  VERROUILLAGE PAR CODE
