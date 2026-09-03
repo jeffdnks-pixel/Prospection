@@ -448,6 +448,13 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
     <div class="sh-body">
       <label class="fl">Nom / Prénom *</label><input class="fi" id="f-name" placeholder="ex : Dupont Marie">
       <label class="fl">Adresse</label><input class="fi" id="f-addr" placeholder="ex : 12 Bd du Petit Nice">
+      <label class="fl">Photo de la façade</label>
+      <img id="f-photo-preview" style="display:none;width:100%;max-height:170px;object-fit:cover;border-radius:var(--rsm);margin-bottom:6px">
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn-s" style="flex:1" onclick="document.getElementById('f-photo-input').click()">📷 Prendre une photo</button>
+        <button type="button" class="btn-s" id="f-photo-remove" style="display:none;flex:0 0 auto;color:var(--red)" onclick="removeContactPhoto()">🗑</button>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="f-photo-input" style="display:none" onchange="handleContactPhoto(event)">
       <label class="fl">Catégorie</label>
       <div class="sel-row">
         <div class="sel-opt" data-cat="vendeur" onclick="selCat(this)">🏠 Vendeur</div>
@@ -762,6 +769,14 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 // sur le panorama le plus proche de ces coordonnées.
 const svUrl=(lat,lng)=>`https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
 const svBtn=(lat,lng)=>`<a href="${svUrl(lat,lng)}" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;padding:9px;background:var(--bg2);color:var(--text2);border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">🧭 Street View</a>`;
+// "Ajouter ici" — contourne le souci qu'un tap sur un marqueur existant ouvre
+// son popup au lieu de placer un nouveau point (immeuble à plusieurs contacts).
+function addHereFrom(type,lat,lng){
+  if(map._popup)map.closePopup();
+  pendingLL={lat,lng};
+  openOvWith(type,null);
+}
+const addHereBtn=(type,lat,lng,label)=>`<div onclick="addHereFrom('${type}',${lat},${lng})" style="text-align:center;font-size:12px;color:var(--blue);font-weight:700;margin-top:8px;padding:6px;cursor:pointer">➕ ${label}</div>`;
 // Icône de regroupement — même langage visuel que les marqueurs individuels
 // (cercle coloré avec le nombre d'éléments empilés au même endroit).
 function clusterIcon(color){
@@ -873,7 +888,11 @@ function initMap(){
   satLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20});
   map=L.map('map',{zoomControl:false,attributionControl:false}).setView([43.262,5.400],13);
   osmLayer.addTo(map);
-  const clusterOpts={maxClusterRadius:50,spiderfyOnMaxZoom:true,disableClusteringAtZoom:19,showCoverageOnHover:false,spiderfyDistanceMultiplier:1.5};
+  // Pas de disableClusteringAtZoom : avec "Ajouter ici", plusieurs points peuvent
+  // avoir des coordonnées identiques au pixel près, même au zoom maximum — sans le
+  // regroupement actif partout, le spiderfy (séparation en éventail) ne se déclenche
+  // plus et un point masque totalement l'autre.
+  const clusterOpts={maxClusterRadius:50,spiderfyOnMaxZoom:true,showCoverageOnHover:false,spiderfyDistanceMultiplier:1.5,zoomToBoundsOnClick:true};
   contactCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#1e56a0')}).addTo(map);
   venteCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#ef4444')}).addTo(map);
   mandatCluster=L.markerClusterGroup({...clusterOpts,iconCreateFunction:clusterIcon('#7c3aed')}).addTo(map);
@@ -961,6 +980,7 @@ function renderContactMarkers(){
     const icon=L.divIcon({className:'',html:`<div style="width:20px;height:20px;border-radius:50%;background:${col};border:3px solid ${border};box-shadow:0 2px 8px rgba(0,0,0,.3)${anim};display:flex;align-items:center;justify-content:center;font-size:9px">${cat.e}</div>`,iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-13]});
     const m=L.marker([c.lat,c.lng],{icon});
     m.bindPopup(`<div style="min-width:210px;font-family:-apple-system,sans-serif">
+      ${c.photo?`<img src="${c.photo}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:6px">`:''}
       <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:2px">${cat.l}</div>
       <div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:2px">${c.name}</div>
       <div style="font-size:12px;color:#64748b;margin-bottom:6px">📍 ${c.addr||'—'}</div>
@@ -974,6 +994,7 @@ function renderContactMarkers(){
         ${svBtn(c.lat,c.lng)}
         <button onclick="_eC('${c.id}')" style="flex:1;padding:9px;background:#1e56a0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
+      ${addHereBtn('contact',c.lat,c.lng,'Ajouter un autre contact ici')}
     </div>`,{maxWidth:260});
     contactCluster.addLayer(m);
     cMk[c.id]=m;
@@ -999,6 +1020,7 @@ function renderVenteMarkers(){
         ${svBtn(v.lat,v.lng)}
         <button onclick="_eV('${v.id}')" style="flex:1;padding:9px;background:${col};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
+      ${addHereBtn('vente',v.lat,v.lng,'Ajouter un autre bien repéré ici')}
     </div>`,{maxWidth:240});
     venteCluster.addLayer(m);
     vMk[v.id]=m;
@@ -1030,6 +1052,7 @@ function renderMandatMarkers(){
         ${svBtn(mn.lat,mn.lng)}
         <button onclick="_eM('${mn.id}')" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
+      ${addHereBtn('mandat',mn.lat,mn.lng,'Ajouter un autre mandat ici')}
     </div>`,{maxWidth:260});
     mandatCluster.addLayer(m);
     mMk[mn.id]=m;
@@ -1058,6 +1081,8 @@ function renderPorteMarkers(){
         ${svBtn(p.lat,p.lng)}
         <button onclick="_eP('${p.id}')" style="flex:1;padding:9px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✏️ Modifier</button>
       </div>
+      ${addHereBtn('porte',p.lat,p.lng,'Ajouter une autre porte ici')}
+      ${addHereBtn('contact',p.lat,p.lng,'Ajouter un contact identifié ici')}
     </div>`,{maxWidth:250});
     porteCluster.addLayer(m);
     pMk[p.id]=m;
@@ -1346,6 +1371,7 @@ function renderContacts(){
         <div class="cc-addr">${c.addr||'Pas d\'adresse'}</div>
         <div class="cc-tags">
           <span class="badge" style="background:${st.bg};color:${st.c}">${st.l}</span>
+          ${c.photo?`<span style="font-size:11px">📷</span>`:''}
           ${z?`<span style="font-size:10px;color:${z.color};font-weight:700;background:${z.color}22;padding:2px 6px;border-radius:5px">${z.name}</span>`:''}
           ${c.price>0?`<span style="font-size:10px;color:var(--text3)">${Number(c.price).toLocaleString('fr-FR')} €</span>`:''}
           ${c.followup?`<span class="${late?'late-tag':'ok-tag'}">${late?'⚠':d===0?'Auj.':d>0?`+${d}j`:''} ${fmtD(c.followup)}</span>`:''}
@@ -1690,6 +1716,8 @@ function openOvWith(type,id){
     document.getElementById('f-zone').value=c.zone||'';
     document.getElementById('f-status').value=c.status||'new';
     document.getElementById('f-source').value=c.source||'Pige PAP';
+    coPhotoData=c.photo||null;
+    setContactPhotoPreview();
     sCat=c.cat||'vendeur';sTemp=c.temp||'warm';
     setTimeout(()=>{
       document.querySelectorAll('[data-cat]').forEach(e=>e.classList.toggle('active',e.dataset.cat===sCat));
@@ -1789,7 +1817,7 @@ function closeOv(type){
 //  SAVE / DELETE
 // ════════════════════════════════════════
 function saveContact(){
-  const d={name:document.getElementById('f-name').value||'Contact sans nom',addr:document.getElementById('f-addr').value||'',zone:document.getElementById('f-zone').value,cat:sCat,temp:sTemp,status:document.getElementById('f-status').value,source:document.getElementById('f-source').value,followup:document.getElementById('f-followup').value,tel:document.getElementById('f-tel').value,price:parseInt(document.getElementById('f-price').value)||0,notes:document.getElementById('f-notes').value};
+  const d={name:document.getElementById('f-name').value||'Contact sans nom',addr:document.getElementById('f-addr').value||'',zone:document.getElementById('f-zone').value,cat:sCat,temp:sTemp,status:document.getElementById('f-status').value,source:document.getElementById('f-source').value,followup:document.getElementById('f-followup').value,tel:document.getElementById('f-tel').value,price:parseInt(document.getElementById('f-price').value)||0,notes:document.getElementById('f-notes').value,photo:coPhotoData};
   if(editId){const i=contacts.findIndex(x=>x.id===editId);if(i>=0)contacts[i]={...contacts[i],...d};}
   else if(pendingLL)contacts.push({id:uid(),lat:pendingLL.lat,lng:pendingLL.lng,...d});
   saveC();closeOv('contact');renderContactMarkers();updateBadge();
@@ -1964,19 +1992,11 @@ function resetAll(){
 }
 
 // ════════════════════════════════════════
-//  PHOTO FICHE PORTE — capture appareil photo, compression côté client,
-//  stockage local (IndexedDB) uniquement. Aucun upload, aucun cloud.
+//  PHOTOS (Porte + Contact) — capture appareil photo, compression côté
+//  client, stockage local (IndexedDB) uniquement. Aucun upload, aucun cloud.
 // ════════════════════════════════════════
-let poPhotoData=null;
-function setPortePhotoPreview(){
-  const img=document.getElementById('po-photo-preview');
-  const rmBtn=document.getElementById('po-photo-remove');
-  if(poPhotoData){img.src=poPhotoData;img.style.display='block';rmBtn.style.display='block';}
-  else{img.style.display='none';img.src='';rmBtn.style.display='none';}
-}
-function handlePortePhoto(e){
-  const f=e.target.files[0];if(!f)return;
-  e.target.value='';
+let poPhotoData=null,coPhotoData=null;
+function compressPhotoFile(file,cb){
   const reader=new FileReader();
   reader.onload=ev=>{
     const img=new Image();
@@ -1986,14 +2006,35 @@ function handlePortePhoto(e){
       const canvas=document.createElement('canvas');
       canvas.width=img.width*scale;canvas.height=img.height*scale;
       canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      poPhotoData=canvas.toDataURL('image/jpeg',0.6);
-      setPortePhotoPreview();
+      cb(canvas.toDataURL('image/jpeg',0.6));
     };
     img.src=ev.target.result;
   };
-  reader.readAsDataURL(f);
+  reader.readAsDataURL(file);
+}
+function setPortePhotoPreview(){
+  const img=document.getElementById('po-photo-preview');
+  const rmBtn=document.getElementById('po-photo-remove');
+  if(poPhotoData){img.src=poPhotoData;img.style.display='block';rmBtn.style.display='block';}
+  else{img.style.display='none';img.src='';rmBtn.style.display='none';}
+}
+function handlePortePhoto(e){
+  const f=e.target.files[0];if(!f)return;e.target.value='';
+  compressPhotoFile(f,data=>{poPhotoData=data;setPortePhotoPreview();});
 }
 function removePortePhoto(){poPhotoData=null;setPortePhotoPreview();}
+
+function setContactPhotoPreview(){
+  const img=document.getElementById('f-photo-preview');
+  const rmBtn=document.getElementById('f-photo-remove');
+  if(coPhotoData){img.src=coPhotoData;img.style.display='block';rmBtn.style.display='block';}
+  else{img.style.display='none';img.src='';rmBtn.style.display='none';}
+}
+function handleContactPhoto(e){
+  const f=e.target.files[0];if(!f)return;e.target.value='';
+  compressPhotoFile(f,data=>{coPhotoData=data;setContactPhotoPreview();});
+}
+function removeContactPhoto(){coPhotoData=null;setContactPhotoPreview();}
 
 // ════════════════════════════════════════
 //  TOURNÉE DU JOUR — tri "plus proche voisin" gratuit (calcul local),
