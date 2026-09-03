@@ -6,10 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Jeff · Prospection">
+<meta name="theme-color" content="#1a56a0">
+<link rel="manifest" href="manifest.json">
 <title>Jeff · Prospection</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -232,6 +235,23 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
 #tip button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}
 #tip-x{background:none;border:none;color:#93c5fd;font-size:18px;cursor:pointer}
 
+/* LOCK SCREEN */
+#lock-screen{position:fixed;inset:0;background:var(--bg);z-index:5000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#lock-screen.h{display:none}
+#lock-input{max-width:220px;text-align:center;font-size:22px;letter-spacing:8px}
+
+/* BACKUP REMINDER (réutilise le style du bandeau notif) */
+#backup-bar{position:fixed;top:0;left:0;right:0;z-index:2900;background:#7c2d12;color:#fff;padding:calc(var(--st)+10px) 14px 10px;display:none;align-items:flex-start;gap:10px;animation:slidedown .3s ease}
+#backup-bar .nb-s{color:#fed7aa}
+#bb-close{background:none;border:none;color:#fdba74;font-size:20px;cursor:pointer}
+
+/* IMPORT CSV PROGRESS */
+#import-ov{position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:5100;display:none;align-items:center;justify-content:center;padding:24px}
+#import-ov.on{display:flex}
+.import-card{background:var(--bg);border-radius:var(--r);padding:24px 22px;max-width:320px;width:100%;text-align:center}
+.import-bar{height:8px;background:var(--bg3);border-radius:4px;margin:14px 0 8px;overflow:hidden}
+.import-bar-f{height:8px;background:var(--blue);border-radius:4px;width:0%;transition:width .2s}
+
 @keyframes pulse{0%,100%{box-shadow:0 2px 8px rgba(185,28,28,.3)}50%{box-shadow:0 0 0 8px rgba(185,28,28,.1)}}
 @keyframes pulse2{0%,100%{box-shadow:0 2px 8px rgba(161,98,7,.3)}50%{box-shadow:0 0 0 6px rgba(161,98,7,.12)}}
 @keyframes pulse3{0%,100%{box-shadow:0 2px 8px rgba(124,58,237,.3)}50%{box-shadow:0 0 0 6px rgba(124,58,237,.12)}}
@@ -240,6 +260,27 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
 </head>
 <body>
 <div id="app">
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen" class="h">
+  <div style="font-size:40px;margin-bottom:10px">🔒</div>
+  <div style="font-size:17px;font-weight:800;margin-bottom:4px">Prospectum verrouillé</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:18px">Entrez votre code pour continuer</div>
+  <input id="lock-input" class="fi" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter')tryUnlock()">
+  <div id="lock-err" style="color:var(--red);font-size:12px;font-weight:700;margin-top:10px;display:none">Code incorrect</div>
+  <button class="btn-p" style="margin-top:16px;width:220px;max-width:220px;flex:none" onclick="tryUnlock()">Déverrouiller</button>
+</div>
+
+<!-- IMPORT CSV PROGRESS -->
+<div id="import-ov">
+  <div class="import-card">
+    <div style="font-size:28px;margin-bottom:6px">📥</div>
+    <div style="font-size:15px;font-weight:800" id="import-title">Import en cours…</div>
+    <div class="import-bar"><div class="import-bar-f" id="import-bar-f"></div></div>
+    <div style="font-size:12px;color:var(--text2)" id="import-status">0 / 0</div>
+    <button class="btn-s" style="margin-top:14px;width:100%" id="import-cancel" onclick="cancelCsvImport()">Annuler</button>
+  </div>
+</div>
 
 <!-- NOTIF -->
 <div id="save-indicator">
@@ -257,6 +298,18 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5}
     </div>
   </div>
   <button id="nb-close" onclick="closeNotif()">×</button>
+</div>
+
+<div id="backup-bar">
+  <div class="nb-body">
+    <div class="nb-t" id="bb-t">⚠ Sauvegarde recommandée</div>
+    <div class="nb-s" id="bb-s"></div>
+    <div class="nb-acts">
+      <button class="nb-btn" style="background:var(--green);color:#fff" onclick="exportJSON();closeBackupBar()">Exporter maintenant</button>
+      <button class="nb-btn" style="background:rgba(255,255,255,.15);color:#fff" onclick="closeBackupBar()">Plus tard</button>
+    </div>
+  </div>
+  <button id="bb-close" onclick="closeBackupBar()">×</button>
 </div>
 
 <div id="tip" style="display:none">
@@ -1435,13 +1488,28 @@ function renderZones(){
 //  CONFIG
 // ════════════════════════════════════════
 function renderConfig(){
+  const pinSet=hasPinSet();
   document.getElementById('config-body').innerHTML=`
+    <div class="sec-h">Import</div>
+    <div class="cfg-row" style="color:var(--blue)" onclick="document.getElementById('fi-csv').click()"><svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg><span>Importer une liste (CSV)</span></div>
+    <input type="file" id="fi-csv" accept=".csv" style="display:none" onchange="handleCsvFile(event)">
+    <div style="font-size:11px;color:var(--text3);margin:-4px 0 12px;line-height:1.5">Colonnes reconnues : Nom, Adresse (obligatoires), Téléphone, Notes, Catégorie, Statut, Source, Zone. Les adresses sont géolocalisées automatiquement (~1 sec/adresse).</div>
     <div class="sec-h">Export & sauvegarde</div>
     <div class="cfg-row" onclick="exportCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter contacts CSV</span></div>
     <div class="cfg-row" onclick="exportMandats()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Exporter mandats CSV</span></div>
     <div class="cfg-row" onclick="exportJSON()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg><span>Sauvegarder tout (JSON)</span></div>
+    ${(() => {
+      const le=localStorage.getItem('j9-last-export');
+      const txt=le?`Dernière sauvegarde : ${fmtD(le.slice(0,10))} (il y a ${daysAgo(le)}j)`:'Aucune sauvegarde effectuée pour le moment';
+      return `<div style="font-size:11px;color:var(--text3);margin:-4px 0 12px">${txt}</div>`;
+    })()}
     <div class="cfg-row" style="color:var(--green)" onclick="document.getElementById('fi').click()"><svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span style="color:var(--green)">Restaurer depuis JSON</span></div>
     <input type="file" id="fi" accept=".json" style="display:none" onchange="doImport(event)">
+    <div class="sec-h" style="margin-top:16px">Sécurité</div>
+    ${pinSet
+      ? `<div class="cfg-row" style="color:var(--red)" onclick="removePin()"><svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span style="color:var(--red)">Désactiver le code d'accès</span></div>
+         <div class="cfg-row" onclick="setupPin()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Modifier le code</span></div>`
+      : `<div class="cfg-row" onclick="setupPin()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Activer un code d'accès</span></div>`}
     <div class="sec-h" style="margin-top:16px">Application</div>
     <div class="cfg-row" onclick="openOv('install')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg><span>Guide installation iPhone / Android</span></div>
     <div class="sec-h" style="margin-top:16px;color:var(--red)">Zone dangereuse</div>
@@ -1725,7 +1793,10 @@ function exportMandats(){
   const rows=mandats.map(mn=>[mn.addr,mn.typeM,mn.typeB,mn.surface,mn.rooms,mn.price,mn.fees,mn.start,mn.end,MS[mn.status]?.l||'',mn.owner,mn.tel,mn.url,zones.find(z=>z.id===mn.zone)?.name||'',mn.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
   dl('\uFEFF'+[h,...rows].map(r=>r.join(',')).join('\n'),'mandats_jeff.csv','text/csv');
 }
-function exportJSON(){dl(JSON.stringify({contacts,rues,ventes,mandats,relancesProg,portes,zones,exportedAt:new Date().toISOString()},null,2),'sauvegarde_jeff_'+today()+'.json','application/json');}
+function exportJSON(){
+  localStorage.setItem('j9-last-export',new Date().toISOString());
+  dl(JSON.stringify({contacts,rues,ventes,mandats,relancesProg,portes,zones,exportedAt:new Date().toISOString()},null,2),'sauvegarde_jeff_'+today()+'.json','application/json');
+}
 function doImport(e){
   const f=e.target.files[0];if(!f)return;
   const fr=new FileReader();
@@ -1750,6 +1821,164 @@ function resetAll(){
 }
 
 // ════════════════════════════════════════
+//  VERROUILLAGE PAR CODE
+// ════════════════════════════════════════
+const PIN_KEY='j9-pin-hash';
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function hasPinSet(){return!!localStorage.getItem(PIN_KEY);}
+function checkLock(){
+  if(!hasPinSet())return;
+  document.getElementById('lock-screen').classList.remove('h');
+  setTimeout(()=>document.getElementById('lock-input').focus(),200);
+}
+async function tryUnlock(){
+  const inp=document.getElementById('lock-input');
+  const val=inp.value;
+  if(!val)return;
+  const h=await sha256Hex(val);
+  if(h===localStorage.getItem(PIN_KEY)){
+    document.getElementById('lock-screen').classList.add('h');
+    inp.value='';
+    document.getElementById('lock-err').style.display='none';
+  }else{
+    document.getElementById('lock-err').style.display='block';
+    inp.value='';
+    inp.focus();
+  }
+}
+async function setupPin(){
+  const p1=prompt('Choisissez un code (4 à 8 chiffres ou caractères) :');
+  if(!p1)return;
+  if(p1.length<4){alert('Le code doit contenir au moins 4 caractères.');return;}
+  const p2=prompt('Confirmez le code :');
+  if(p1!==p2){alert('Les deux codes ne correspondent pas. Rien n\'a été changé.');return;}
+  localStorage.setItem(PIN_KEY,await sha256Hex(p1));
+  alert('Code d\'accès activé. Il sera demandé à chaque ouverture de l\'app.');
+  renderConfig();
+}
+async function removePin(){
+  const cur=prompt('Entrez votre code actuel pour le désactiver :');
+  if(!cur)return;
+  if(await sha256Hex(cur)!==localStorage.getItem(PIN_KEY)){alert('Code incorrect.');return;}
+  localStorage.removeItem(PIN_KEY);
+  alert('Code d\'accès désactivé.');
+  renderConfig();
+}
+
+// ════════════════════════════════════════
+//  RAPPEL DE SAUVEGARDE
+// ════════════════════════════════════════
+function closeBackupBar(){document.getElementById('backup-bar').style.display='none';}
+function checkBackupReminder(){
+  // Ne pas superposer au bandeau des relances s'il est déjà affiché
+  if(document.getElementById('notif-bar').style.display==='flex')return;
+  const totalData=contacts.length+mandats.length+portes.length+ventes.length;
+  if(!totalData)return;
+  const le=localStorage.getItem('j9-last-export');
+  const days=le?daysAgo(le):null;
+  const overdue=(days===null)||days>3;
+  if(!overdue)return;
+  document.getElementById('bb-s').textContent=days===null
+    ?'Aucune sauvegarde JSON n\'a encore été faite depuis cet appareil. Exporte-la avant de partir sur le terrain.'
+    :`Dernière sauvegarde il y a ${days} jour${days>1?'s':''}. Pense à exporter avant de partir sur le terrain.`;
+  document.getElementById('backup-bar').style.display='flex';
+}
+
+// ════════════════════════════════════════
+//  IMPORT CSV EN MASSE
+// ════════════════════════════════════════
+let csvImportCancelled=false;
+function normHeader(h){return(h||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+const CSV_FIELD_MAP={
+  nom:'name',name:'name',
+  adresse:'addr',address:'addr',
+  telephone:'tel',tel:'tel',phone:'tel',
+  notes:'notes',note:'notes',
+  categorie:'cat',category:'cat',cat:'cat',
+  statut:'status',status:'status',
+  source:'source',
+  zone:'zone',
+  prix:'price',price:'price',
+  relance:'followup',followup:'followup'
+};
+const CAT_ALIASES={vendeur:'vendeur',acheteur:'acheteur',apporteur:'apporteur',locataire:'locataire',pro:'notaire',notaire:'notaire',autre:'autre'};
+const STATUS_ALIASES={'non contacte':'new',nouveau:'new',new:'new',contacte:'contacted',contacted:'contacted',rdv:'rdv','a relancer':'relance',relance:'relance',froid:'froid',mandat:'mandat'};
+function mapZoneNameToId(name){
+  if(!name)return'';
+  const n=normHeader(name);
+  const z=zones.find(zz=>normHeader(zz.name)===n);
+  return z?z.id:'';
+}
+async function geocodeAddress(addr){
+  try{
+    const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&countrycodes=fr&accept-language=fr`);
+    const arr=await res.json();
+    if(arr&&arr[0])return{lat:parseFloat(arr[0].lat),lng:parseFloat(arr[0].lon)};
+  }catch(e){}
+  return null;
+}
+function handleCsvFile(e){
+  const f=e.target.files[0];if(!f)return;
+  e.target.value='';
+  Papa.parse(f,{
+    header:true,skipEmptyLines:true,
+    complete:res=>startCsvImport(res.data)
+  });
+}
+function cancelCsvImport(){csvImportCancelled=true;}
+async function startCsvImport(rows){
+  if(!rows||!rows.length){alert('Fichier CSV vide ou illisible.');return;}
+  // Construit le mapping colonne CSV -> champ interne à partir des en-têtes réels
+  const rawHeaders=Object.keys(rows[0]);
+  const headerMap={};
+  rawHeaders.forEach(h=>{const key=CSV_FIELD_MAP[normHeader(h)];if(key)headerMap[h]=key;});
+  if(!Object.values(headerMap).includes('name')||!Object.values(headerMap).includes('addr')){
+    alert('Le CSV doit contenir au minimum une colonne "Nom" et une colonne "Adresse".');
+    return;
+  }
+  csvImportCancelled=false;
+  document.getElementById('import-ov').classList.add('on');
+  document.getElementById('import-title').textContent='Import en cours…';
+  document.getElementById('import-cancel').style.display='block';
+  let ok=0,skipped=0,failed=0;
+  for(let i=0;i<rows.length;i++){
+    if(csvImportCancelled)break;
+    const row=rows[i];
+    const d={};
+    Object.entries(headerMap).forEach(([csvH,field])=>{d[field]=(row[csvH]||'').toString().trim();});
+    document.getElementById('import-bar-f').style.width=Math.round((i/rows.length)*100)+'%';
+    document.getElementById('import-status').textContent=`${i+1} / ${rows.length}  (${ok} ok, ${failed} échec, ${skipped} ignoré)`;
+    if(!d.name||!d.addr){skipped++;continue;}
+    const geo=await geocodeAddress(d.addr);
+    if(!geo){failed++;await new Promise(r=>setTimeout(r,1100));continue;}
+    contacts.push({
+      id:uid(),lat:geo.lat,lng:geo.lng,
+      name:d.name,addr:d.addr,
+      zone:mapZoneNameToId(d.zone),
+      cat:CAT_ALIASES[normHeader(d.cat)]||'vendeur',
+      temp:'warm',
+      status:STATUS_ALIASES[normHeader(d.status)]||'new',
+      source:d.source||'Pige PAP',
+      followup:d.followup||'',
+      tel:d.tel||'',
+      price:parseInt(d.price)||0,
+      notes:d.notes||''
+    });
+    ok++;
+    await new Promise(r=>setTimeout(r,1100)); // respecte la limite Nominatim (1 req/sec)
+  }
+  document.getElementById('import-bar-f').style.width='100%';
+  saveC();renderContactMarkers();renderAll();fillZoneDropdowns();updateBadge();
+  document.getElementById('import-ov').classList.remove('on');
+  alert(csvImportCancelled
+    ?`Import annulé.\n${ok} contact(s) importé(s) avant l'arrêt, ${failed} échec(s), ${skipped} ligne(s) ignorée(s) (nom/adresse manquant).`
+    :`Import terminé : ${ok} contact(s) importé(s), ${failed} adresse(s) non géolocalisée(s), ${skipped} ligne(s) ignorée(s) (nom/adresse manquant).`);
+}
+
+// ════════════════════════════════════════
 //  BOOT
 // ════════════════════════════════════════
 const sEl=document.createElement('style');
@@ -1757,6 +1986,7 @@ sEl.textContent=`@keyframes pulse{0%,100%{box-shadow:0 2px 8px rgba(185,28,28,.3
 document.head.appendChild(sEl);
 
 // Boot async — attendre loadAll (IndexedDB) avant d'afficher
+checkLock();
 (async()=>{
   await loadAll();
   initMap();
@@ -1764,7 +1994,16 @@ document.head.appendChild(sEl);
   fillZoneDropdowns();
   updateBadge();
   setTimeout(checkNotifs,1500);
+  setTimeout(checkBackupReminder,1700);
 })();
+
+// Cache de l'app pour un chargement possible sans réseau (les tuiles de carte
+// restent en revanche dépendantes d'une connexion active)
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW registration failed',e));
+  });
+}
 if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)&&!window.navigator.standalone)setTimeout(()=>document.getElementById('tip').style.display='flex',7000);
 document.addEventListener('click',e=>{
   if(!e.target.closest('.search-pill')&&!e.target.closest('#search-results'))document.getElementById('search-results').style.display='none';
